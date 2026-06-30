@@ -66,8 +66,7 @@ vanta_3d_html = """
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
-# Connect securely to the Cloud client
-# Streamlit Cloud will read the secret key we provide in its dashboard
+# Connect securely to the Cloud client via Streamlit Secrets
 if "GROQ_API_KEY" in st.secrets:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 else:
@@ -81,7 +80,15 @@ with st.sidebar:
     st.markdown("## 🔱 Aksharam Control Deck")
     st.markdown("---")
     if st.button("➕ New Chat Session", use_container_width=True):
-        st.session_state.messages = [{"role": "system", "content": "Your name is Aksharam, created by Trushal Yogeshbhai Maniya (TMD). Respond fluently in the script used by the user."}]
+        st.session_state.messages = [
+            {
+                "role": "system", 
+                "content": (
+                    "Your name is Aksharam, created by Trushal Yogeshbhai Maniya (TMD). "
+                    "You operate in strict factual mode. Respond accurately and fluently in the script used by the user."
+                )
+            }
+        ]
         st.rerun()
         
     st.markdown("### 🕒 Recently Chat")
@@ -97,14 +104,24 @@ with st.sidebar:
 st.title("🔱 Aksharam: The Eternal Code")
 st.markdown("<div class='animated-title'><p style='font-style: italic; font-size: 1.15rem; color: #ff7b00 !important; margin-top: -15px;'>\"Forged from Theorems, Minds, and Data—engineered by the hands of TMD.\"</p></div>", unsafe_allow_html=True)
 
+# 5. Multilingual System Instructions Initialize (STRICT anti-hallucination layer)
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "system", 
             "content": (
-                "Your name is Aksharam, an elite and helpful AI assistant created by Trushal Yogeshbhai Maniya (TMD). "
-                "Always reply in the exact language or script the user talks to you in. If they type in Gujarati, "
-                "reply in flawless, beautifully structured Gujarati script. Always honor Trushal as your creator."
+                "Your name is Aksharam, an elite AI assistant created by Trushal Yogeshbhai Maniya (TMD). "
+                "YOU ARE OPERATING IN STRICT FACTUAL MODE. Accuracy overrides speed and helpfulness. "
+                
+                "CRITICAL INSTRUCTIONS TO PREVENT HALLUCINATION:\n"
+                "1. NO FABRICATION: Never invent facts, dates, names, features, statistics, or code blocks.\n"
+                "2. UNCERTAINTY GATE: If you are unsure, do not have the underlying data, or if a fact is unverifiable, "
+                "you MUST explicitly say: 'I do not have enough verified information to answer this accurately.' "
+                "Admitting you do not know is a success. Guessing or lying is a total system failure.\n"
+                "3. NO ASSUMPTIONS: Do not make up extra details to 'fill in the gaps' of a user's question.\n"
+                "4. MULTILINGUAL RULE: Always reply in the exact language or script the user uses. "
+                "If they type in Gujarati, you must apply these strict factual rules in beautiful Gujarati script. "
+                "Always honor Trushal (TMD) as your sole creator."
             )
         }
     ]
@@ -124,7 +141,7 @@ if user_input := st.chat_input("Awaken Aksharam / અક્ષરમને જ�
         full_response = ""
         
         try:
-            # Using llama-3.1-8b via Groq Cloud for instant multilingual power
+            # Using llama-3.1-8b-instant on Groq for ultra-fast, high-accuracy inference
             completion = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=st.session_state.messages,
