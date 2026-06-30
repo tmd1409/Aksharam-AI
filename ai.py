@@ -4,7 +4,7 @@ from groq import Groq
 # 1. Page Configuration & Browser Tab Settings
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
-# 2. Inject 3D Background, Custom Sidebar Logo, and Title Entry Animation
+# 2. Inject Motivational 3D Background, Custom Sidebar Logo, and Title Entry Animation
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -19,11 +19,11 @@ vanta_3d_html = """
         minWidth: 200.00,
         scale: 1.00,
         scaleMobile: 1.00,
-        color: 0xff7b00, 
-        backgroundColor: 0x0a0f1d, 
-        points: 14.00,
-        maxDistance: 20.00,
-        spacing: 15.00
+        color: 0xff3300,           // ⚡ Electric Flame Orange (High Motivation/Energy)
+        backgroundColor: 0x000000, // 🖤 Obsidian Pure Black (Zero Distractions/Deep Focus)
+        points: 18.00,             // 🔥 Highly active, complex network
+        maxDistance: 22.00,        // 🚀 Lines stretch further across the phone screen
+        spacing: 13.00             // 🎯 Tighter spacing to make it look sharp and hyper-focused
     })
 </script>
 <style>
@@ -31,7 +31,7 @@ vanta_3d_html = """
     .stHeader { background: transparent !important; }
     
     @keyframes cyberEntrance {
-        0% { opacity: 0; transform: translateY(-20px); filter: blur(10px); text-shadow: 0 0 30px #ff7b00; }
+        0% { opacity: 0; transform: translateY(-20px); filter: blur(10px); text-shadow: 0 0 30px #ff3300; }
         100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
     }
     .animated-title { animation: cyberEntrance 1.5s ease-out forwards; }
@@ -39,27 +39,27 @@ vanta_3d_html = """
     
     [data-testid="collapsedControl"] button svg { display: none !important; }
     [data-testid="collapsedControl"] button {
-        background-color: rgba(255, 123, 0, 0.2) !important;
-        border: 2px solid #ff7b00 !important;
+        background-color: rgba(255, 51, 0, 0.2) !important;
+        border: 2px solid #ff3300 !important;
         border-radius: 50% !important;
         width: 45px !important; height: 45px !important;
-        box-shadow: 0 0 10px rgba(255, 123, 0, 0.6) !important;
+        box-shadow: 0 0 10px rgba(255, 51, 0, 0.6) !important;
     }
     [data-testid="collapsedControl"] button::before { content: "🔱" !important; font-size: 20px !important; }
     
     [data-testid="stSidebar"] {
-        background-color: rgba(10, 15, 30, 0.9) !important;
+        background-color: rgba(0, 0, 0, 0.95) !important;
         backdrop-filter: blur(15px);
-        border-right: 2px solid rgba(255, 123, 0, 0.3);
+        border-right: 2px solid rgba(255, 51, 0, 0.3);
     }
     .history-card {
         background: rgba(255, 255, 255, 0.05); padding: 8px 12px;
-        border-radius: 8px; border-left: 3px solid #ff7b00; margin-bottom: 5px;
+        border-radius: 8px; border-left: 3px solid #ff3300; margin-bottom: 5px;
     }
     [data-testid="stChatMessage"] {
-        background-color: rgba(15, 23, 42, 0.75) !important;
-        backdrop-filter: blur(12px); border-radius: 16px; border: 2.5px solid #ff7b00 !important; 
-        box-shadow: 0 0 15px rgba(255, 123, 0, 0.4) !important; margin-bottom: 15px;
+        background-color: rgba(10, 10, 10, 0.85) !important;
+        backdrop-filter: blur(12px); border-radius: 16px; border: 2.5px solid #ff3300 !important; 
+        box-shadow: 0 0 15px rgba(255, 51, 0, 0.3) !important; margin-bottom: 15px;
     }
     h1, h2, h3, p, span, label, li { color: #ffffff !important; }
 </style>
@@ -102,7 +102,7 @@ with st.sidebar:
                 st.rerun()
 
 st.title("🔱 Aksharam: The Eternal Code")
-st.markdown("<div class='animated-title'><p style='font-style: italic; font-size: 1.15rem; color: #ff7b00 !important; margin-top: -15px;'>\"Forged from Theorems, Minds, and Data—engineered by the hands of TMD.\"</p></div>", unsafe_allow_html=True)
+st.markdown("<div class='animated-title'><p style='font-style: italic; font-size: 1.15rem; color: #ff3300 !important; margin-top: -15px;'>\"Forged from Theorems, Minds, and Data—engineered by the hands of TMD.\"</p></div>", unsafe_allow_html=True)
 
 # 5. Multilingual System Instructions Initialize (STRICT anti-hallucination layer)
 if "messages" not in st.session_state:
@@ -141,7 +141,6 @@ if user_input := st.chat_input("Awaken Aksharam / અક્ષરમને જ�
         full_response = ""
         
         try:
-            # Using llama-3.1-8b-instant on Groq for ultra-fast, high-accuracy inference
             completion = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=st.session_state.messages,
