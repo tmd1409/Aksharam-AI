@@ -21,7 +21,13 @@ else:
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
-cookie_manager = stx.CookieManager()
+
+# CRITICAL FIX: Safe initialization of the Cookie Manager with a structural unique key
+@st.cache_resource
+def get_cookie_manager():
+    return stx.CookieManager(key="aksharam_cookies_secure_layer")
+
+cookie_manager = get_cookie_manager()
 
 COUNTRY_CODES = [
     {"flag": "🇮🇳", "name": "India", "prefix": "+91"},
@@ -94,23 +100,21 @@ if "generated_otp" not in st.session_state:
 if "otp_time" not in st.session_state:
     st.session_state.otp_time = 0.0
 
-# Read Saved Local Browser Storage Values
+# Fetch device browser profile safely
 saved_user = cookie_manager.get("aksharam_user")
 saved_ident = cookie_manager.get("aksharam_ident")
 saved_secret = cookie_manager.get("aksharam_secret")
 
-# AUTO-RECOGNITION LAYER
 if saved_user and saved_ident and saved_secret and st.session_state.app_mode == "Gateway":
     st.session_state.app_mode = "Already_Logged_In"
 
-# --- ENGINE ROUTER STATES ---
+# --- APPLICATION CONTROLLER STATES ---
 
-# STATE 0: ALREADY LOGGED IN SHORTCUT
 if st.session_state.app_mode == "Already_Logged_In":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<div class='quote-box'>\"One step ahead with us.\"</div>", unsafe_allow_html=True)
     st.subheader(f"🔄 Welcome Back, {saved_user}!")
-    st.write(f"Account: `{saved_ident}` is active on this device.")
+    st.write(f"Identity Target: `{saved_ident}`")
     
     check_pass = st.text_input("Confirm Your Email Password to Enter", type="password", placeholder="••••••••")
     
@@ -123,7 +127,7 @@ if st.session_state.app_mode == "Already_Logged_In":
                 st.session_state.app_mode = "Connected"
                 st.rerun()
             else:
-                st.error("Incorrect email account password. Access denied.")
+                st.error("Incorrect password assertion matrix verification failed.")
     with col2:
         if st.button("Switch Account 👤", use_container_width=True):
             cookie_manager.delete("aksharam_user")
@@ -135,7 +139,6 @@ if st.session_state.app_mode == "Already_Logged_In":
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# STATE A: INITIAL CHOICE GATEWAY
 elif st.session_state.app_mode == "Gateway":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<h1 style='text-align:center;'>🔱 Aksharam</h1>", unsafe_allow_html=True)
@@ -152,7 +155,6 @@ elif st.session_state.app_mode == "Gateway":
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# STATE B: GUEST MODE
 elif st.session_state.app_mode == "Guest_Setup":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("Guest Terminal")
@@ -166,7 +168,6 @@ elif st.session_state.app_mode == "Guest_Setup":
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# STATE C: AUTH FIELD INITIALIZATION
 elif st.session_state.app_mode == "Auth_Setup":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<div class='quote-box'>\"One step ahead with us.\"</div>", unsafe_allow_html=True)
@@ -210,7 +211,6 @@ elif st.session_state.app_mode == "Auth_Setup":
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# STATE D: OTP SUBMISSION SCREEN
 elif st.session_state.app_mode == "OTP_Screen":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔒 Verify Security Token")
@@ -240,7 +240,7 @@ elif st.session_state.app_mode == "OTP_Screen":
             
     if st.button("Verify Credentials & Deploy Core", use_container_width=True):
         if full_user_otp == st.session_state.generated_otp or full_user_otp == "786786":
-            # Save Login Credentials to Local Browser Cookie Memory Permanent Store
+            # Direct cache injection via Universal cookie controller
             cookie_manager.set("aksharam_user", st.session_state.username)
             cookie_manager.set("aksharam_ident", st.session_state.identity)
             cookie_manager.set("aksharam_secret", st.session_state.saved_pass)
@@ -254,7 +254,7 @@ elif st.session_state.app_mode == "OTP_Screen":
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- STATE E: MAIN RUNNING CORE APPLICATION ---
+# --- MAIN ACTIVE SYSTEM ---
 SYSTEM_PROMPT = f"Your name is Aksharam, an elite assistant engineered by Trushal Yogeshbhai Maniya (TMD). Assisting user: {st.session_state.username}."
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
