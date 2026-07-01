@@ -3,7 +3,6 @@ from groq import Groq
 import httpx
 import random
 import time
-import extra_streamlit_components as stx
 
 # 1. Initialize Page Config
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
@@ -21,9 +20,6 @@ else:
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
-
-# Initialize Cookie Manager directly
-cookie_manager = stx.CookieManager(key="aksharam_cookies_secure_layer_v3")
 
 COUNTRY_CODES = [
     {"flag": "🇮🇳", "name": "India", "prefix": "+91"},
@@ -82,37 +78,17 @@ vanta_3d_html = """
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
-# Initialize Session Data Pools
-if "app_mode" not in st.session_state:
-    st.session_state.app_mode = "Gateway"
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "identity" not in st.session_state:
-    st.session_state.identity = ""
-if "saved_pass" not in st.session_state:
-    st.session_state.saved_pass = ""
-if "generated_otp" not in st.session_state:
-    st.session_state.generated_otp = ""
-if "otp_time" not in st.session_state:
-    st.session_state.otp_time = 0.0
-if "cookie_checked" not in st.session_state:
-    st.session_state.cookie_checked = False
+# Initialize Session Data Pools securely
+if "app_mode" not in st.session_state: st.session_state.app_mode = "Gateway"
+if "username" not in st.session_state: st.session_state.username = ""
+if "identity" not in st.session_state: st.session_state.identity = ""
+if "saved_pass" not in st.session_state: st.session_state.saved_pass = ""
+if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
+if "otp_time" not in st.session_state: st.session_state.otp_time = 0.0
+if "is_remembered" not in st.session_state: st.session_state.is_remembered = False
 
-# CRITICAL FIX: Give the browser 1 second to load the cookie storage records
-if not st.session_state.cookie_checked:
-    time.sleep(1.2)
-    st.session_state.cookie_checked = True
-    st.rerun()
-
-# Fetch device profile safely after delay synchronization
-try:
-    saved_user = cookie_manager.get("aksharam_user")
-    saved_ident = cookie_manager.get("aksharam_ident")
-    saved_secret = cookie_manager.get("aksharam_secret")
-except Exception:
-    saved_user, saved_ident, saved_secret = None, None, None
-
-if saved_user and saved_ident and saved_secret and st.session_state.app_mode == "Gateway":
+# Fallback check if session already has data stored
+if st.session_state.is_remembered and st.session_state.app_mode == "Gateway":
     st.session_state.app_mode = "Already_Logged_In"
 
 # --- APPLICATION CONTROLLER STATES ---
@@ -120,29 +96,22 @@ if saved_user and saved_ident and saved_secret and st.session_state.app_mode == 
 if st.session_state.app_mode == "Already_Logged_In":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<div class='quote-box'>\"One step ahead with us.\"</div>", unsafe_allow_html=True)
-    st.subheader(f"🔄 Welcome Back, {saved_user}!")
-    st.write(f"Identity Target: `{saved_ident}`")
+    st.subheader(f"🔄 Welcome Back, {st.session_state.username}!")
+    st.write(f"Account identity matched: `{st.session_state.identity}`")
     
     check_pass = st.text_input("Confirm Your Email Password to Enter", type="password", placeholder="••••••••")
     
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Unlock Engine 🚀", use_container_width=True):
-            if check_pass == saved_secret:
-                st.session_state.username = saved_user
-                st.session_state.identity = saved_ident
+            if check_pass == st.session_state.saved_pass:
                 st.session_state.app_mode = "Connected"
                 st.rerun()
             else:
                 st.error("Incorrect password verification failed.")
     with col2:
         if st.button("Switch Account 👤", use_container_width=True):
-            try:
-                cookie_manager.delete("aksharam_user")
-                cookie_manager.delete("aksharam_ident")
-                cookie_manager.delete("aksharam_secret")
-            except Exception:
-                pass
+            st.session_state.is_remembered = False
             st.session_state.app_mode = "Gateway"
             st.rerun()
             
@@ -250,13 +219,7 @@ elif st.session_state.app_mode == "OTP_Screen":
             
     if st.button("Verify Credentials & Deploy Core", use_container_width=True):
         if full_user_otp == st.session_state.generated_otp or full_user_otp == "786786":
-            try:
-                cookie_manager.set("aksharam_user", st.session_state.username)
-                cookie_manager.set("aksharam_ident", st.session_state.identity)
-                cookie_manager.set("aksharam_secret", st.session_state.saved_pass)
-            except Exception:
-                pass
-            
+            st.session_state.is_remembered = True
             st.session_state.app_mode = "Connected"
             st.success("Verification successful!")
             st.rerun()
@@ -279,12 +242,7 @@ with st.sidebar:
     st.markdown(f"**Operator:** `{st.session_state.username}`")
     st.markdown("---")
     if st.button("🔒 Secure Session Exit", use_container_width=True):
-        try:
-            cookie_manager.delete("aksharam_user")
-            cookie_manager.delete("aksharam_ident")
-            cookie_manager.delete("aksharam_secret")
-        except Exception:
-            pass
+        st.session_state.is_remembered = False
         st.session_state.app_mode = "Gateway"
         st.rerun()
 
