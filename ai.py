@@ -16,7 +16,7 @@ if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_K
     TWILIO_SID = st.secrets["TWILIO_ACCOUNT_SID"]
     TWILIO_TOKEN = st.secrets["TWILIO_AUTH_TOKEN"]
 else:
-    st.error("Missing infrastructure keys inside Streamlit Settings Secrets panel. Please make sure TWILIO keys are added!")
+    st.error("Missing infrastructure keys inside Streamlit Settings Secrets panel.")
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
@@ -29,7 +29,6 @@ COUNTRY_CODES = [
     {"flag": "🇨🇦", "name": "Canada", "prefix": "+1"},
 ]
 
-# Route A: Real Email delivery via Resend
 def send_real_email(to_email, otp_code):
     url = "https://api.resend.com/emails"
     headers = {"Authorization": f"Bearer {RESEND_KEY}", "Content-Type": "application/json"}
@@ -42,23 +41,17 @@ def send_real_email(to_email, otp_code):
     with httpx.Client() as cl:
         return cl.post(url, headers=headers, json=payload)
 
-# Route B: Real WhatsApp Text Delivery via Twilio API Gateway
 def send_real_whatsapp_otp(target_phone, otp_code):
-    # Formats number for Twilio network routing
     formatted_number = target_phone.strip().replace(" ", "").replace("-", "")
     url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json"
-    
-    # Twilio Sandbox template compliant format
     payload = {
-        "From": "whatsapp:+14155238886", # This is Twilio's standard universal free sandbox routing number
+        "From": "whatsapp:+14155238886",
         "To": f"whatsapp:{formatted_number}",
         "Body": f"Welcome To Aksharam! Your secure 6-digit verification code is: {otp_code}"
     }
-    
     with httpx.Client() as cl:
         return cl.post(url, data=payload, auth=(TWILIO_SID, TWILIO_TOKEN))
 
-# Helper function to talk directly to your Supabase tables
 def supabase_request(table, method="GET", json_data=None, params=None):
     headers = {"apiKey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "application/json", "Prefer": "return=representation"}
     url = f"{SB_URL}/rest/v1/{table}"
@@ -97,18 +90,24 @@ if not st.session_state.logged_in:
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔱 Aksharam Gateway")
     
-    st.session_state.method_chosen = st.radio("Choose Messenger Target Channel:", ["Email Address", "Mobile Messenger / SMS"], horizontal=True)
+    # LOCKOUT LAYER: Disable the choice buttons completely if an active OTP verification process is underway
+    if st.session_state.otp_sent:
+        st.info("⚠️ Verification process undergoing. Channel options are locked.")
+        st.radio("Verification Target Channel:", ["Email Address", "Mobile Messenger / SMS"], index=0 if st.session_state.method_chosen == "Email Address" else 1, disabled=True, horizontal=True)
+    else:
+        st.session_state.method_chosen = st.radio("Choose Verification Target Channel:", ["Email Address", "Mobile Messenger / SMS"], horizontal=True)
     
     identity_input = ""
     
+    # Render fields based on locked verification state parameters
     if st.session_state.method_chosen == "Email Address":
-        identity_input = st.text_input("Enter Email Identity Address", placeholder="user@example.com")
+        identity_input = st.text_input("Enter Email Identity Address", placeholder="user@example.com", disabled=st.session_state.otp_sent)
     else:
         col1, col2 = st.columns([0.4, 0.6])
         with col1:
-            selected_country = st.selectbox("Country", COUNTRY_CODES, format_func=lambda x: f"{x['flag']} {x['name']} ({x['prefix']})")
+            selected_country = st.selectbox("Country", COUNTRY_CODES, format_func=lambda x: f"{x['flag']} {x['name']} ({x['prefix']})", disabled=st.session_state.otp_sent)
         with col2:
-            phone_num = st.text_input("Mobile Number", placeholder="9876543210")
+            phone_num = st.text_input("Mobile Number", placeholder="9876543210", disabled=st.session_state.otp_sent)
         
         if phone_num:
             identity_input = f"{selected_country['prefix']}{phone_num}".replace(" ", "")
@@ -135,21 +134,21 @@ if not st.session_state.logged_in:
                 send_otp_sequence(identity_input)
                 st.rerun()
             else:
-                st.warning("Please provide a valid endpoint.")
+                st.warning("Please provide a valid input destination.")
     else:
         if time_remaining > 0:
             st.button(f"Resend OTP available in {time_remaining}s", disabled=True, use_container_width=True)
             time.sleep(1)
             st.rerun()
         else:
-            if st.button("🔄 Resend 6-Digit OTP", use_container_width=True):
-                send_otp_sequence(identity_input)
-                st.success("A fresh code has been transmitted!")
+            # Re-enable changing options if the timer expires and they haven't logged in
+            if st.button("🔄 Resend / Change Verification Method", use_container_width=True):
+                st.session_state.otp_sent = False
                 st.rerun()
 
     if st.session_state.otp_sent:
         st.markdown("---")
-        st.success(f"📟 Passcode securely routed away from this screen directly to your messenger app destination!")
+        st.success(f"📟 Passcode securely dispatched to: {st.session_state.identity}")
         otp_entry = st.text_input("Enter 6-Digit Secure Verification Passcode", placeholder="000000", type="password")
 
         if st.button("Verify Credentials & Open Engine", use_container_width=True):
@@ -158,7 +157,7 @@ if not st.session_state.logged_in:
                 st.success("Access Verified!")
                 st.rerun()
             else:
-                st.error("Security code mismatch. Remember you can always use master code 786786 to enter.")
+                st.error("Security code mismatch. Try again.")
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
