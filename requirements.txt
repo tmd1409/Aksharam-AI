@@ -2,3 +2,4 @@ streamlit
 groq
 httpx
 extra-streamlit-components
+infobip-api-python-sdk
