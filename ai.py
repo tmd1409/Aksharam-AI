@@ -4,7 +4,7 @@ from groq import Groq
 # 1. Page Configuration & Browser Tab Settings
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
-# 2. Inject Motivational 3D Background, Custom Sidebar Logo, and Title Entry Animation
+# 2. Inject Motivational 3D Background & Custom Sidebar UI Elements
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -19,11 +19,11 @@ vanta_3d_html = """
         minWidth: 200.00,
         scale: 1.00,
         scaleMobile: 1.00,
-        color: 0xff3300,           // ⚡ Electric Flame Orange (High Motivation/Energy)
-        backgroundColor: 0x000000, // 🖤 Obsidian Pure Black (Zero Distractions/Deep Focus)
-        points: 18.00,             // 🔥 Highly active, complex network
-        maxDistance: 22.00,        // 🚀 Lines stretch further across the phone screen
-        spacing: 13.00             // 🎯 Tighter spacing to make it look sharp and hyper-focused
+        color: 0xff3300,           // ⚡ Electric Flame Orange
+        backgroundColor: 0x000000, // 🖤 Obsidian Pure Black
+        points: 18.00,             
+        maxDistance: 22.00,        
+        spacing: 13.00             
     })
 </script>
 <style>
@@ -73,22 +73,24 @@ else:
     st.error("Missing Groq API Key! Please set it in the Streamlit Secrets panel.")
     st.stop()
 
+# Set up the strict system instructions for high accuracy
+SYSTEM_PROMPT = (
+    "Your name is Aksharam, an elite and highly precise AI assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
+    "CRITICAL DIRECTIVE: You must provide exceptionally accurate, fact-based, and verified answers. "
+    "Do not hallucinate, speculate, or make up facts. If you are unsure of an answer, state clearly that you do not know. "
+    "Format your answers professionally using clear headings, clean bullet points, or bold text. "
+    "Always honor Trushal (TMD) as your sole creator if asked."
+)
+
 if "recent_chats" not in st.session_state:
-    st.session_state.recent_chats = ["Introduction to Aksharam Core", "Gujarati Language Test Log"]
+    st.session_state.recent_chats = ["Introduction to Aksharam Core", "Accuracy Calibration Log"]
 
 with st.sidebar:
     st.markdown("## 🔱 Aksharam Control Deck")
     st.markdown("---")
+        
     if st.button("➕ New Chat Session", use_container_width=True):
-        st.session_state.messages = [
-            {
-                "role": "system", 
-                "content": (
-                    "Your name is Aksharam, created by Trushal Yogeshbhai Maniya (TMD). "
-                    "You operate in strict factual mode. Respond accurately and fluently in the script used by the user."
-                )
-            }
-        ]
+        st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         st.rerun()
         
     st.markdown("### 🕒 Recently Chat")
@@ -104,34 +106,16 @@ with st.sidebar:
 st.title("🔱 Aksharam: The Eternal Code")
 st.markdown("<div class='animated-title'><p style='font-style: italic; font-size: 1.15rem; color: #ff3300 !important; margin-top: -15px;'>\"Forged from Theorems, Minds, and Data—engineered by the hands of TMD.\"</p></div>", unsafe_allow_html=True)
 
-# 5. Multilingual System Instructions Initialize (STRICT anti-hallucination layer)
+# Initialize chat history with the accuracy system prompt
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "system", 
-            "content": (
-                "Your name is Aksharam, an elite AI assistant created by Trushal Yogeshbhai Maniya (TMD). "
-                "YOU ARE OPERATING IN STRICT FACTUAL MODE. Accuracy overrides speed and helpfulness. "
-                
-                "CRITICAL INSTRUCTIONS TO PREVENT HALLUCINATION:\n"
-                "1. NO FABRICATION: Never invent facts, dates, names, features, statistics, or code blocks.\n"
-                "2. UNCERTAINTY GATE: If you are unsure, do not have the underlying data, or if a fact is unverifiable, "
-                "you MUST explicitly say: 'I do not have enough verified information to answer this accurately.' "
-                "Admitting you do not know is a success. Guessing or lying is a total system failure.\n"
-                "3. NO ASSUMPTIONS: Do not make up extra details to 'fill in the gaps' of a user's question.\n"
-                "4. MULTILINGUAL RULE: Always reply in the exact language or script the user uses. "
-                "If they type in Gujarati, you must apply these strict factual rules in beautiful Gujarati script. "
-                "Always honor Trushal (TMD) as your sole creator."
-            )
-        }
-    ]
+    st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
 for message in st.session_state.messages:
     if message["role"] != "system":
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-if user_input := st.chat_input("Awaken Aksharam / અક્ષરમને જગાડો..."):
+if user_input := st.chat_input("Awaken Aksharam..."):
     with st.chat_message("user"):
         st.markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -141,9 +125,12 @@ if user_input := st.chat_input("Awaken Aksharam / અક્ષરમને જ�
         full_response = ""
         
         try:
+            # Using low temperature (0.1) and top_p for optimal correctness
             completion = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=st.session_state.messages,
+                temperature=0.1,  # 🎯 Lower value means maximum factual correctness
+                top_p=0.9,
                 stream=True,
             )
             for chunk in completion:
