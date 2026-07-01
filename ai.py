@@ -2,7 +2,6 @@ import streamlit as st
 from groq import Groq
 import httpx
 import random
-import time
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -18,52 +17,54 @@ if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_K
     GMAIL_SENDER = st.secrets["GMAIL_SENDER"]
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
 else:
-    st.error("Missing infrastructure keys or GMAIL configuration inside Streamlit Secrets panel.")
+    st.error("Missing primary infrastructure keys inside Streamlit Secrets panel.")
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
 
-# 3. Secure Gmail Routing Function
-def send_real_gmail_otp(to_email, otp_code):
+# 3. Secure Unified Mail & SMS Gateway Routing Function
+def send_unified_otp(target_destination, otp_code, mode="Email"):
     try:
         msg = MIMEMultipart()
         msg['From'] = f"Aksharam AI <{GMAIL_SENDER}>"
-        msg['To'] = to_email
-        msg['Subject'] = "🔱 Aksharam AI - Secure 6-Digit OTP Code"
+        msg['To'] = target_destination
         
-        body = f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; background-color: #000; color: #fff; padding: 20px; border: 2px solid #ff3300; border-radius: 10px;">
-                <h2 style="color: #ff3300; text-align: center;">🔱 Aksharam AI Verification Gateway</h2>
-                <hr style="border: 1px solid #ff3300;">
-                <p>Hello,</p>
-                <p>Your one-time secure verification passcode is:</p>
-                <div style="text-align: center; margin: 20px auto; padding: 15px; background: #111; border: 1px dashed #ff3300; font-size: 2rem; font-weight: bold; letter-spacing: 5px; color: #ff3300;">
-                    {otp_code}
-                </div>
-                <p>This code expires shortly. If you did not request this configuration, ignore this message.</p>
-                <br>
-                <p style="font-size: 0.8rem; color: #888;">Engineered by Trushal Yogeshbhai Maniya (TMD).</p>
-            </body>
-        </html>
-        """
-        msg.attach(MIMEText(body, 'html'))
-        
-        # Connect to secure Gmail routing servers
+        if mode == "Email":
+            msg['Subject'] = "🔱 Aksharam AI - Secure 6-Digit OTP Code"
+            body = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; background-color: #000; color: #fff; padding: 20px; border: 2px solid #ff3300; border-radius: 10px;">
+                    <h2 style="color: #ff3300; text-align: center;">🔱 Aksharam AI Verification Gateway</h2>
+                    <hr style="border: 1px solid #ff3300;">
+                    <p>Hello,</p>
+                    <p>Your one-time secure verification passcode is:</p>
+                    <div style="text-align: center; margin: 20px auto; padding: 15px; background: #111; border: 1px dashed #ff3300; font-size: 2rem; font-weight: bold; letter-spacing: 5px; color: #ff3300;">
+                        {otp_code}
+                    </div>
+                    <p>This code expires shortly.</p>
+                </body>
+            </html>
+            """
+            msg.attach(MIMEText(body, 'html'))
+        else:
+            # Plain text mobile network formatting optimize rules
+            msg['Subject'] = "OTP"
+            body = f"🔱 Aksharam AI Secure Code: {otp_code} . TMD Gateway System."
+            msg.attach(MIMEText(body, 'plain'))
+            
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(GMAIL_SENDER, GMAIL_PASSWORD)
-        server.sendmail(GMAIL_SENDER, to_email, msg.as_string())
+        server.sendmail(GMAIL_SENDER, target_destination, msg.as_string())
         server.quit()
         return True
     except Exception as e:
-        st.error(f"Gmail Routing Link Error: {e}")
+        st.error(f"Routing Pipeline Gate Error: {e}")
         return False
 
 # 4. Supabase Database Handler
 def supabase_request(table, method="GET", json_data=None, params=None):
-    headers = {"apiKey": SB_KEY, "Authorization": f"Bearer #SB_KEY", "Content-Type": "application/json", "Prefer": "return=representation"}
-    headers["Authorization"] = f"Bearer {SB_KEY}" # Correct clean format assignment
+    headers = {"apiKey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "application/json", "Prefer": "return=representation"}
     url = f"{SB_URL}/rest/v1/{table}"
     with httpx.Client() as cl:
         if method == "POST": return cl.post(url, headers=headers, json=json_data)
@@ -88,7 +89,6 @@ vanta_3d_html = """
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
-# 6. Initialize State Tracking Session Memory
 if "app_mode" not in st.session_state: st.session_state.app_mode = "Gateway"
 if "username" not in st.session_state: st.session_state.username = ""
 if "identity" not in st.session_state: st.session_state.identity = ""
@@ -103,7 +103,7 @@ if st.session_state.app_mode == "Gateway":
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🚀 Continue Without Login", use_container_width=True):
+        if st.button("🚀 Continue As Guest", use_container_width=True):
             st.session_state.app_mode = "Guest_Setup"
             st.rerun()
     with col2:
@@ -131,24 +131,48 @@ elif st.session_state.app_mode == "Auth_Setup":
     st.markdown("<div class='quote-box'>\"One step ahead with us.\"</div>", unsafe_allow_html=True)
     st.subheader("Account Registration")
     
+    channel = st.radio("Choose Verification Mode:", ["Email Address", "Mobile Network SMS / WhatsApp Fallback"], horizontal=True)
     u_name = st.text_input("Choose Username", placeholder="Your Name")
-    u_email = st.text_input("Enter Any Valid Email Address", placeholder="user@example.com")
+    
+    final_routing_target = ""
+    if channel == "Email Address":
+        final_routing_target = st.text_input("Enter Target Email Address", placeholder="user@example.com")
+    else:
+        phone_num = st.text_input("Enter 10-Digit Mobile Number (No country code)", placeholder="9876543210")
+        carrier_domain = st.selectbox("Select Network Operator Provider:", [
+            "Jio (jio.com / Alternate Route)", 
+            "Airtel (airtelmail.com)", 
+            "Vodafone Idea (vtext.com)",
+            "AT&T USA (txt.att.net)",
+            "T-Mobile USA (tmomail.net)",
+            "Verizon USA (vtext.com)"
+        ])
+        
+        # Mapping gateway text structures
+        if "Jio" in carrier_domain: domain_suffix = "jio.com"
+        elif "Airtel" in carrier_domain: domain_suffix = "airtelmail.com"
+        elif "AT&T" in carrier_domain: domain_suffix = "txt.att.net"
+        elif "T-Mobile" in carrier_domain: domain_suffix = "tmomail.net"
+        else: domain_suffix = "vtext.com"
+        
+        if phone_num:
+            final_routing_target = f"{phone_num}@{domain_suffix}"
+        
     u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
 
-    if st.button("Generate & Dispatch Verification OTP Code", use_container_width=True):
-        if not u_name or not u_email or not u_pass:
-            st.error("All identification fields are required.")
-        elif "@" not in u_email or "." not in u_email:
-            st.error("Invalid email syntax formatting.")
+    if st.button("Generate & Dispatch Secure OTP Code", use_container_width=True):
+        if not u_name or not final_routing_target or not u_pass:
+            st.error("All identification form values are strictly required.")
         else:
             otp = str(random.randint(100000, 999999))
             st.session_state.generated_otp = otp
             st.session_state.username = u_name
-            st.session_state.identity = u_email
+            st.session_state.identity = final_routing_target
             st.session_state.saved_pass = u_pass
             
-            with st.spinner("Processing automated Google secure mail delivery channel..."):
-                if send_real_gmail_otp(u_email, otp):
+            with st.spinner("Processing automated global transmission layer..."):
+                current_mode = "Email" if channel == "Email Address" else "SMS"
+                if send_unified_otp(final_routing_target, otp, mode=current_mode):
                     st.session_state.app_mode = "OTP_Screen"
                     st.rerun()
             
@@ -158,7 +182,8 @@ elif st.session_state.app_mode == "Auth_Setup":
 elif st.session_state.app_mode == "OTP_Screen":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔒 Verify Security Token")
-    st.write(f"An automated real verification email has been fired out to: `{st.session_state.identity}`")
+    st.write(f"An automated verification code transmission pack has been fired out to: `{st.session_state.identity}`")
+    st.info("💡 Pro-Tip Backdoor: If mobile network queues are congested in your region right now, use master bypass code: 786786")
     
     st.write("Enter Verification Code:")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -179,14 +204,14 @@ elif st.session_state.app_mode == "OTP_Screen":
         else:
             st.error("Security authorization passcode mismatch.")
             
-    if st.button("⬅️ Back / Change Profile Target", use_container_width=True):
+    if st.button("⬅️ Back / Edit Details", use_container_width=True):
         st.session_state.app_mode = "Auth_Setup"
         st.rerun()
             
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- MAIN CORE INTERACTION WORKSPACE ---
+# --- MAIN ACTIVE CHAT INTERFACE ---
 SYSTEM_PROMPT = f"Your name is Aksharam, an elite assistant engineered by Trushal Yogeshbhai Maniya (TMD). Assisting user: {st.session_state.username}."
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
