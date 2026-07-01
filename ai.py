@@ -22,8 +22,8 @@ else:
 
 client = Groq(api_key=GROQ_KEY)
 
-# FIX: Initialize the cookie manager directly without decorators to stop the CachedWidgetWarning
-cookie_manager = stx.CookieManager(key="aksharam_cookies_secure_layer_v2")
+# Initialize Cookie Manager directly
+cookie_manager = stx.CookieManager(key="aksharam_cookies_secure_layer_v3")
 
 COUNTRY_CODES = [
     {"flag": "🇮🇳", "name": "India", "prefix": "+91"},
@@ -82,7 +82,7 @@ vanta_3d_html = """
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
-# Initialize System States
+# Initialize Session Data Pools
 if "app_mode" not in st.session_state:
     st.session_state.app_mode = "Gateway"
 if "username" not in st.session_state:
@@ -95,8 +95,16 @@ if "generated_otp" not in st.session_state:
     st.session_state.generated_otp = ""
 if "otp_time" not in st.session_state:
     st.session_state.otp_time = 0.0
+if "cookie_checked" not in st.session_state:
+    st.session_state.cookie_checked = False
 
-# Fetch device browser profile safely without caching rules interference
+# CRITICAL FIX: Give the browser 1 second to load the cookie storage records
+if not st.session_state.cookie_checked:
+    time.sleep(1.2)
+    st.session_state.cookie_checked = True
+    st.rerun()
+
+# Fetch device profile safely after delay synchronization
 try:
     saved_user = cookie_manager.get("aksharam_user")
     saved_ident = cookie_manager.get("aksharam_ident")
@@ -271,6 +279,12 @@ with st.sidebar:
     st.markdown(f"**Operator:** `{st.session_state.username}`")
     st.markdown("---")
     if st.button("🔒 Secure Session Exit", use_container_width=True):
+        try:
+            cookie_manager.delete("aksharam_user")
+            cookie_manager.delete("aksharam_ident")
+            cookie_manager.delete("aksharam_secret")
+        except Exception:
+            pass
         st.session_state.app_mode = "Gateway"
         st.rerun()
 
