@@ -1,46 +1,46 @@
 import streamlit as st
 from groq import Groq
-import sqlite3
-import hashlib
+import httpx
 
-# 1. Page Configuration
+# 1. Initialize Page Config
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
-# 2. Database Setup (Handles Sign Up & Encrypted Storage)
-def init_db():
-    conn = sqlite3.connect("aksharam_users.db", check_same_thread=False)
-    cursor = conn.cursor()
-    # Create Users Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            email TEXT UNIQUE,
-            password TEXT
-        )
-    """)
-    # Create Individual Chat History Table linked to users
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chat_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            role TEXT,
-            content TEXT
-        )
-    """)
-    conn.commit()
-    return conn
+# 2. Get Secure Infrastructure Secrets
+if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY"]):
+    GROQ_KEY = st.secrets["GROQ_API_KEY"]
+    SB_URL = st.secrets["SUPABASE_URL"]
+    SB_KEY = st.secrets["SUPABASE_KEY"]
+else:
+    st.error("Missing architecture keys inside Streamlit Advanced Settings Secrets panel.")
+    st.stop()
 
-conn = init_db()
-cursor = conn.cursor()
+client = Groq(api_key=GROQ_KEY)
 
-# Helper function to hash passwords securely
-def make_hash(password):
-    return hashlib.sha256(str.encode(password)).hexdigest()
+# Helper function to run direct REST calls to Supabase Auth Engine
+def supabase_auth_request(endpoint, json_data):
+    headers = {
+        "apiKey": SB_KEY, 
+        "Content-Type": "application/json"
+    }
+    url = f"{SB_URL}/auth/v1/{endpoint}"
+    with httpx.Client() as cl:
+        return cl.post(url, headers=headers, json=json_data)
 
-def check_hash(password, hashed_password):
-    return hashlib.sha256(str.encode(password)).hexdigest() == hashed_password
+# Helper function to read/write persistent data to Supabase Tables
+def supabase_db_request(table, method="GET", json_data=None, params=None):
+    headers = {
+        "apiKey": SB_KEY,
+        "Authorization": f"Bearer {st.session_state.get('auth_token', SB_KEY)}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+    url = f"{SB_URL}/rest/v1/{table}"
+    with httpx.Client() as cl:
+        if method == "POST":
+            return cl.post(url, headers=headers, json=json_data)
+        return cl.get(url, headers=headers, params=params)
 
-# 3. Inject Styling & 3D Background
+# 3. Inject Visual Styling Core
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -64,115 +64,97 @@ vanta_3d_html = """
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
-# 4. Session State Authentication Initialization
+# Initialize Session Memory States
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.username = ""
+    st.session_state.email = ""
+    st.session_state.auth_token = ""
 
-# --- AUTHENTICATION INTERFACE ---
+# --- SECURITY GATEWAY INTERFACE (OTP LOGIC) ---
 if not st.session_state.logged_in:
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔱 Aksharam Gateway")
+    st.write("Enter your email to receive your secure 6-digit OTP code.")
+
+    email_input = st.text_input("Email Address", placeholder="name@example.com")
     
-    auth_mode = st.tabs(["🔐 Sign In", "📝 Create Account"])
-    
-    # SIGN IN TAB
-    with auth_mode[0]:
-        login_user = st.text_input("Username", key="login_user")
-        login_pass = st.text_input("Password", type="password", key="login_pass")
-        
-        if st.button("Access Core Engine", use_container_width=True):
-            cursor.execute("SELECT password FROM users WHERE username = ?", (login_user,))
-            user_record = cursor.fetchone()
-            if user_record and check_hash(login_pass, user_record[0]):
+    if st.button("Send Magic 6-Digit OTP", use_container_width=True):
+        if email_input:
+            # Native Supabase endpoint to trigger OTP/MagicLink generation
+            res = supabase_auth_request("otp", {"email": email_input, "options": {"shouldCreateUser": True}})
+            if res.status_code in [200, 201]:
+                st.success(f"OTP successfully sent to {email_input}! Check your inbox or spam folder.")
+                st.session_state.email = email_input
+            else:
+                st.error(f"Error sending OTP: {res.text}")
+        else:
+            st.warning("Please specify a valid email terminal.")
+
+    st.markdown("---")
+    otp_code = st.text_input("Enter 6-Digit OTP Verification Passcode", placeholder="123456")
+
+    if st.button("Verify Keys & Launch Engine", use_container_width=True):
+        if st.session_state.get("email") and otp_code:
+            # FIX: Sending specific 'email' type ensures Supabase handles it as a 6-digit numeric token
+            verify_res = supabase_auth_request("verify", {
+                "email": st.session_state.email,
+                "token": otp_code,
+                "type": "email"
+            })
+
+            if verify_res.status_code == 200:
+                auth_data = verify_res.json()
                 st.session_state.logged_in = True
-                st.session_state.username = login_user
-                st.success(f"Welcome back, {login_user}! Syncing environment...")
+                st.session_state.auth_token = auth_data.get("access_token")
+                st.success("Tunnel Verified! Syncing persistent profile...")
                 st.rerun()
             else:
-                st.error("Invalid credentials. Try again.")
-                
-    # SIGN UP TAB
-    with auth_mode[1]:
-        new_user = st.text_input("Choose Username", key="new_user")
-        new_email = st.text_input("Email Address", key="new_email")
-        new_pass = st.text_input("Create Password", type="password", key="new_pass")
-        confirm_pass = st.text_input("Confirm Password", type="password", key="confirm_pass")
-        
-        if st.button("Register & Initialize", use_container_width=True):
-            if new_pass != confirm_pass:
-                st.error("Passwords do not match.")
-            elif not new_user or not new_email or not new_pass:
-                st.error("Please fill in all registration blocks.")
-            else:
-                hashed_pass = make_hash(new_pass)
-                try:
-                    cursor.execute("INSERT INTO users VALUES (?, ?, ?)", (new_user, new_email, hashed_pass))
-                    conn.commit()
-                    st.success("Account securely generated! Please proceed to Sign In.")
-                except sqlite3.IntegrityError:
-                    st.error("Username or Email already registered.")
-                    
+                st.error("Invalid or expired 6-Digit OTP token. Click 'Send Magic 6-Digit OTP' again.")
+        else:
+            st.error("Please request an OTP token first before validation.")
+
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- MAIN SECURE APP ENVIRONMENT (Accessible only after logging in) ---
-
-if "GROQ_API_KEY" in st.secrets:
-    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-else:
-    st.error("Missing Groq API Key inside settings secrets panel.")
-    st.stop()
+# --- MAIN SECURE WORKING ENVIRONMENT ---
 
 SYSTEM_PROMPT = (
-    "Your name is Aksharam, an elite, highly precise AI assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
-    "You provide factual, structured answers using clean typography, points, or bold headers."
+    "Your name is Aksharam, an elite assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
+    "Provide factual, structured answers with clean layouts."
 )
 
-# Load logged-in user's saved chat history from the Database
+# Pull Chat Logs permanently from Supabase Cloud
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    cursor.execute("SELECT role, content FROM chat_history WHERE username = ?", (st.session_state.username,))
-    saved_messages = cursor.fetchall()
-    for role, content in saved_messages:
-        st.session_state.messages.append({"role": role, "content": content})
+    db_res = supabase_db_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.email}", "order": "id.asc"})
+    if db_res.status_code == 200:
+        for entry in db_res.json():
+            st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
 
-# Sidebar controls
 with st.sidebar:
-    st.markdown(f"### 👤 Active User: **{st.session_state.username}**")
+    st.markdown(f"### 👤 Connected: \n`{st.session_state.email}`")
     st.markdown("---")
     
-    if st.button("🔒 Secure Sign Out", use_container_width=True):
+    if st.button("🔒 Log Out", use_container_width=True):
         st.session_state.logged_in = False
-        st.session_state.username = ""
+        st.session_state.email = ""
         st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         st.rerun()
-        
-    if st.button("🗑️ Clear My Saved Cloud Chat", use_container_width=True):
-        cursor.execute("DELETE FROM chat_history WHERE username = ?", (st.session_state.username,))
-        conn.commit()
-        st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        st.success("Your private cloud history wiped!")
-        st.rerun()
 
-st.title("🔱 Aksharam: Private Engine")
-st.markdown(f"<p style='color: #ff3300 !important; margin-top: -15px;'>Encrypted Tunnel Active • Session Owner: {st.session_state.username}</p>", unsafe_allow_html=True)
+st.title("🔱 Aksharam: Persistent Cloud Platform")
 
-# Render visible chats
 for message in st.session_state.messages:
     if message["role"] != "system":
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# Process input
-if user_input := st.chat_input("Ask Aksharam safely..."):
+if user_input := st.chat_input("Interact with Aksharam..."):
     with st.chat_message("user"):
         st.markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
     
-    # Save User message to Database immediately
-    cursor.execute("INSERT INTO chat_history (username, role, content) VALUES (?, ?, ?)", (st.session_state.username, "user", user_input))
-    conn.commit()
+    # Sync User Input into Supabase
+    supabase_db_request("chat_logs", "POST", {"email": st.session_state.email, "role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
@@ -183,7 +165,6 @@ if user_input := st.chat_input("Ask Aksharam safely..."):
                 model="llama-3.1-8b-instant",
                 messages=st.session_state.messages,
                 temperature=0.1,
-                top_p=0.9,
                 stream=True,
             )
             for chunk in completion:
@@ -193,10 +174,8 @@ if user_input := st.chat_input("Ask Aksharam safely..."):
             response_placeholder.markdown(full_response)
             
             st.session_state.messages.append({"role": "assistant", "content": full_response})
-            
-            # Save Assistant response to Database immediately
-            cursor.execute("INSERT INTO chat_history (username, role, content) VALUES (?, ?, ?)", (st.session_state.username, "assistant", full_response))
-            conn.commit()
+            # Sync AI Answer into Supabase
+            supabase_db_request("chat_logs", "POST", {"email": st.session_state.email, "role": "assistant", "content": full_response})
             
         except Exception as e:
-            st.error(f"Cloud Connection Error: {e}")
+            st.error(f"Cloud Routing Error: {e}")
