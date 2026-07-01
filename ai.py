@@ -3,23 +3,22 @@ from groq import Groq
 import httpx
 import random
 import smtplib
+import urllib.parse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # 1. Initialize Page Config
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
-# 2. Grab Infrastructure Keys Safely from Streamlit Secrets
-if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "INFOBIP_API_KEY", "INFOBIP_BASE_URL"]):
+# 2. Grab Infrastructure Keys Safely
+if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD"]):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SB_URL = st.secrets["SUPABASE_URL"]
     SB_KEY = st.secrets["SUPABASE_KEY"]
     GMAIL_SENDER = st.secrets["GMAIL_SENDER"]
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
-    IB_KEY = st.secrets["INFOBIP_API_KEY"]
-    IB_URL = st.secrets["INFOBIP_BASE_URL"]
 else:
-    st.error("Missing architecture keys or INFOBIP secrets inside Streamlit Secrets panel.")
+    st.error("Missing architecture keys inside Streamlit Secrets panel.")
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
@@ -57,50 +56,6 @@ def send_real_gmail_otp(to_email, otp_code):
         st.error(f"Gmail Routing Link Error: {e}")
         return False
 
-# 4. Native Public Infobip HTTP Gateway (Zero External Dependencies)
-def send_public_sms_otp(target_phone, otp_code):
-    try:
-        # Strip all formatting spaces/dashes
-        clean_phone = ''.join(filter(str.isdigit, target_phone))
-        
-        # Clean background link checks for Base URL format
-        base_url = IB_URL.strip().rstrip('/')
-        url = f"{base_url}/sms/2/text/advanced"
-        
-        # Format API Authorization wrapper safely
-        api_key = IB_KEY.strip()
-        if not api_key.startswith("App "):
-            auth_header = f"App {api_key}"
-        else:
-            auth_header = api_key
-
-        payload = {
-            "messages": [
-                {
-                    "destinations": [{"to": clean_phone}],
-                    "from": "AksharamAI",
-                    "text": f"🔱 Aksharam AI Verification Code: {otp_code}. Engineered by TMD."
-                }
-            ]
-        }
-        
-        headers = {
-            "Authorization": auth_header,
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
-        
-        with httpx.Client() as cl:
-            res = cl.post(url, headers=headers, json=payload)
-            if res.status_code in [200, 201]:
-                return True
-            else:
-                st.error(f"Public Network Rejection ({res.status_code}): {res.text}")
-                return False
-    except Exception as e:
-        st.error(f"Infobip Native Routing Error: {e}")
-        return False
-
 # Supabase Request Handler
 def supabase_request(table, method="GET", json_data=None, params=None):
     headers = {"apiKey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "application/json", "Prefer": "return=representation"}
@@ -133,6 +88,7 @@ if "username" not in st.session_state: st.session_state.username = ""
 if "identity" not in st.session_state: st.session_state.identity = ""
 if "saved_pass" not in st.session_state: st.session_state.saved_pass = ""
 if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
+if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
 
 # --- APPLICATION CONTROLLER STATES ---
 
@@ -170,18 +126,18 @@ elif st.session_state.app_mode == "Auth_Setup":
     st.markdown("<div class='quote-box'>\"One step ahead with us.\"</div>", unsafe_allow_html=True)
     st.subheader("Account Registration")
     
-    channel = st.radio("Choose Verification Mode:", ["Email Address", "Mobile Network Text Message"], horizontal=True)
+    channel = st.radio("Choose Verification Mode:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
     u_name = st.text_input("Choose Username", placeholder="Your Name")
     
     u_target = ""
     if channel == "Email Address":
         u_target = st.text_input("Enter Target Email Address", placeholder="user@example.com")
     else:
-        u_target = st.text_input("Enter Phone Number (With Country Code, e.g., 919876543210)", placeholder="919876543210")
+        u_target = st.text_input("Enter WhatsApp Number (With Country Code, e.g., 919876543210)", placeholder="919876543210")
         
     u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
 
-    if st.button("Generate & Dispatch Secure OTP Code", use_container_width=True):
+    if st.button("Generate Verification Step", use_container_width=True):
         if not u_name or not u_target or not u_pass:
             st.error("All identification boxes are required.")
         else:
@@ -197,18 +153,44 @@ elif st.session_state.app_mode == "Auth_Setup":
                         st.session_state.app_mode = "OTP_Screen"
                         st.rerun()
             else:
-                with st.spinner("Dispatching live SMS via Native HTTP Framework..."):
-                    if send_public_sms_otp(u_target, otp):
-                        st.session_state.app_mode = "OTP_Screen"
-                        st.rerun()
+                # Clean the phone number format
+                clean_phone = ''.join(filter(str.isdigit, u_target))
+                message_text = f"🔱 Aksharam AI Security Gateway \nYour unique secure verification OTP is: {otp}\n\nEngineered by TMD."
+                encoded_message = urllib.parse.quote(message_text)
+                
+                # Generate WhatsApp deep link structure
+                st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
+                st.session_state.app_mode = "WhatsApp_Link_Screen"
+                st.rerun()
             
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
+
+elif st.session_state.app_mode == "WhatsApp_Link_Screen":
+    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
+    st.title("📲 Send Your WhatsApp OTP")
+    st.write("Because carrier mobile towers block free automatic messages, click the button below to generate your real code securely via WhatsApp:")
+    
+    # Render direct link button for deep routing
+    st.markdown(f'''
+        <a href="{st.session_state.whatsapp_url}" target="_blank" style="text-decoration:none;">
+            <div style="background-color:#25D366; color:white; text-align:center; padding:12px; border-radius:10px; font-weight:bold; font-size:1.2rem; margin-bottom:20px; box-shadow: 0 4px 15px rgba(37,211,102,0.4);">
+                🟢 Open WhatsApp & Receive OTP
+            </div>
+        </a>
+    ''', unsafe_allow_html=True)
+    
+    st.write("After you check the message on your phone, click 'Next' to input it.")
+    if st.button("Proceed to Entry Screen ➡️", use_container_width=True):
+        st.session_state.app_mode = "OTP_Screen"
+        st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 elif st.session_state.app_mode == "OTP_Screen":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔒 Verify Security Token")
-    st.write(f"An automated live verification code has been fired out to: `{st.session_state.identity}`")
+    st.write(f"Enter the code dispatched to: `{st.session_state.identity}`")
     
     st.write("Enter Verification Code:")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
