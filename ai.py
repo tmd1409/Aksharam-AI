@@ -6,17 +6,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# Infobip SDK Native Framework Imports
-from infobip_api_client.api_client import ApiClient, Configuration
-from infobip_api_client.model.sms_advanced_text_message import SmsAdvancedTextMessage
-from infobip_api_client.model.sms_destination import SmsDestination
-from infobip_api_client.model.sms_text_message_request import SmsTextMessageRequest
-from infobip_api_client.api.send_sms_api import SendSmsApi
-
 # 1. Initialize Page Config
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
-# 2. Grab Infrastructure Keys Safely
+# 2. Grab Infrastructure Keys Safely from Streamlit Secrets
 if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "INFOBIP_API_KEY", "INFOBIP_BASE_URL"]):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SB_URL = st.secrets["SUPABASE_URL"]
@@ -64,36 +57,48 @@ def send_real_gmail_otp(to_email, otp_code):
         st.error(f"Gmail Routing Link Error: {e}")
         return False
 
-# 4. Real Public Infobip SDK Gateway Function (Sends to ANY number)
+# 4. Native Public Infobip HTTP Gateway (Zero External Dependencies)
 def send_public_sms_otp(target_phone, otp_code):
     try:
-        # Strip formatting characters out
+        # Strip all formatting spaces/dashes
         clean_phone = ''.join(filter(str.isdigit, target_phone))
         
-        # Initialize direct secure config layer using the SDK patterns
-        config = Configuration(
-            host=IB_URL,
-            api_key={"APIKeyHeader": IB_KEY},
-            api_key_prefix={"APIKeyHeader": "App"}
-        )
+        # Clean background link checks for Base URL format
+        base_url = IB_URL.strip().rstrip('/')
+        url = f"{base_url}/sms/2/text/advanced"
         
-        # Build advanced structured routing instructions
-        sms_request = SmsTextMessageRequest(
-            messages=[
-                SmsAdvancedTextMessage(
-                    destinations=[SmsDestination(to=clean_phone)],
-                    _from="AksharamAI",
-                    text=f"🔱 Aksharam AI Verification Code: {otp_code}. Engineered by TMD."
-                )
+        # Format API Authorization wrapper safely
+        api_key = IB_KEY.strip()
+        if not api_key.startswith("App "):
+            auth_header = f"App {api_key}"
+        else:
+            auth_header = api_key
+
+        payload = {
+            "messages": [
+                {
+                    "destinations": [{"to": clean_phone}],
+                    "from": "AksharamAI",
+                    "text": f"🔱 Aksharam AI Verification Code: {otp_code}. Engineered by TMD."
+                }
             ]
-        )
+        }
         
-        # Trigger transmission via Infobip APIs client instance
-        api_instance = SendSmsApi(ApiClient(config))
-        api_instance.send_sms_message(sms_text_message_request=sms_request)
-        return True
+        headers = {
+            "Authorization": auth_header,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        with httpx.Client() as cl:
+            res = cl.post(url, headers=headers, json=payload)
+            if res.status_code in [200, 201]:
+                return True
+            else:
+                st.error(f"Public Network Rejection ({res.status_code}): {res.text}")
+                return False
     except Exception as e:
-        st.error(f"Infobip SDK Delivery Handshake Failure: {e}")
+        st.error(f"Infobip Native Routing Error: {e}")
         return False
 
 # Supabase Request Handler
@@ -192,7 +197,7 @@ elif st.session_state.app_mode == "Auth_Setup":
                         st.session_state.app_mode = "OTP_Screen"
                         st.rerun()
             else:
-                with st.spinner("Dispatching live SMS via Infobip SDK Networks..."):
+                with st.spinner("Dispatching live SMS via Native HTTP Framework..."):
                     if send_public_sms_otp(u_target, otp):
                         st.session_state.app_mode = "OTP_Screen"
                         st.rerun()
