@@ -14,10 +14,22 @@ if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_K
     SB_KEY = st.secrets["SUPABASE_KEY"]
     RESEND_KEY = st.secrets["RESEND_API_KEY"]
 else:
-    st.error("Missing architecture keys inside Streamlit Advanced Settings Secrets panel. Make sure RESEND_API_KEY is added!")
+    st.error("Missing architecture keys inside Streamlit Settings Secrets panel.")
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
+
+# Supported Countries List with Flag, Name, and Prefix
+COUNTRY_CODES = [
+    {"flag": "🇮🇳", "name": "India", "prefix": "+91"},
+    {"flag": "🇺🇸", "name": "United States", "prefix": "+1"},
+    {"flag": "🇬🇧", "name": "United Kingdom", "prefix": "+44"},
+    {"flag": "🇦🇪", "name": "UAE", "prefix": "+971"},
+    {"flag": "🇨🇦", "name": "Canada", "prefix": "+1"},
+    {"flag": "🇦🇺", "name": "Australia", "prefix": "+61"},
+    {"flag": "🇸🇬", "name": "Singapore", "prefix": "+65"},
+    {"flag": "🇩🇪", "name": "Germany", "prefix": "+49"},
+]
 
 # Helper function to send actual emails via Resend API
 def send_real_email(to_email, otp_code):
@@ -29,7 +41,7 @@ def send_real_email(to_email, otp_code):
     payload = {
         "from": "Aksharam AI <onboarding@resend.dev>",
         "to": [to_email],
-        "subject": "🔱 Welcome To Aksharam - Your 6-Digit OTP Verification Passcode",
+        "subject": "🔱 Welcome To Aksharam - 6-Digit OTP Verification Passcode",
         "html": f"""
         <div style="font-family: sans-serif; padding: 20px; background-color: #000; color: #fff; border: 2px solid #ff3300; border-radius: 12px; max-width: 500px;">
             <h2 style="color: #ff3300;">Welcome To Aksharam</h2>
@@ -78,6 +90,7 @@ vanta_3d_html = """
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; backdrop-filter: blur(15px); border-right: 2px solid rgba(255, 51, 0, 0.3); }
     [data-testid="stChatMessage"] { background-color: rgba(10, 10, 10, 0.85) !important; border-radius: 16px; border: 2.5px solid #ff3300 !important; margin-bottom: 15px; }
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 25px; border-radius: 15px; box-shadow: 0 0 25px rgba(255, 51, 0, 0.4); max-width: 450px; margin: 40px auto; }
+    .notification-banner { background: linear-gradient(90deg, #1e1e1e, #111) !important; border-left: 5px solid #ff3300 !important; border-radius: 8px; padding: 15px; margin: 15px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
 </style>
 """
@@ -86,27 +99,49 @@ st.components.v1.html(vanta_3d_html, height=0, width=0)
 # Initialize Core Authentication States
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.email = ""
+    st.session_state.identity = ""
     st.session_state.generated_otp = ""
     st.session_state.otp_sent = False
     st.session_state.otp_time = 0.0
+    st.session_state.method_chosen = "Email"
 
 # --- OTP SECURITY GATEWAY INTERFACE ---
 if not st.session_state.logged_in:
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔱 Aksharam Gateway")
-    st.write("Secure dynamic verification sequence.")
-
-    email_input = st.text_input("Enter Email Identity Address", placeholder="user@example.com", value=st.session_state.email)
+    
+    # 1. Option Selector Toggle
+    st.session_state.method_chosen = st.radio("Choose Verification Method:", ["Email Address", "Mobile Number"], horizontal=True)
+    
+    identity_input = ""
+    
+    if st.session_state.method_chosen == "Email Address":
+        identity_input = st.text_input("Enter Email Identity Address", placeholder="user@example.com")
+    else:
+        # 2. Country Dropdown with Flags and Prefixes
+        col1, col2 = st.columns([0.4, 0.6])
+        with col1:
+            selected_country = st.selectbox(
+                "Country", 
+                COUNTRY_CODES, 
+                format_func=lambda x: f"{x['flag']} {x['name']} ({x['prefix']})"
+            )
+        with col2:
+            phone_num = st.text_input("Mobile Number", placeholder="9876543210")
+        
+        if phone_num:
+            identity_input = f"{selected_country['prefix']} {phone_num}"
 
     def send_otp_sequence(target):
         otp = str(random.randint(100000, 999999))
         st.session_state.generated_otp = otp
-        st.session_state.email = target
+        st.session_state.identity = target
         st.session_state.otp_sent = True
         st.session_state.otp_time = time.time()
-        # Fire the real email out instantly
-        send_real_email(target, otp)
+        
+        # Route dispatching depending on method choice
+        if st.session_state.method_chosen == "Email Address":
+            send_real_email(target, otp)
 
     current_time = time.time()
     time_passed = current_time - st.session_state.otp_time
@@ -114,12 +149,11 @@ if not st.session_state.logged_in:
 
     if not st.session_state.otp_sent:
         if st.button("Send 6-Digit Verification OTP", use_container_width=True):
-            if email_input:
-                send_otp_sequence(email_input)
-                st.success("OTP dispatched! Check your email inbox (and spam folder).")
+            if identity_input:
+                send_otp_sequence(identity_input)
                 st.rerun()
             else:
-                st.warning("Please input a valid email terminal address.")
+                st.warning("Please provide a valid communication endpoint.")
     else:
         if time_remaining > 0:
             st.button(f"Resend OTP available in {time_remaining}s", disabled=True, use_container_width=True)
@@ -127,11 +161,28 @@ if not st.session_state.logged_in:
             st.rerun()
         else:
             if st.button("🔄 Resend 6-Digit OTP", use_container_width=True):
-                send_otp_sequence(email_input)
-                st.success("A fresh security code has been dispatched to your inbox!")
+                send_otp_sequence(identity_input)
+                st.success("A fresh security code has been dispatched!")
                 st.rerun()
 
+    # If Mobile is chosen, flash the custom "Welcome To Aksharam" Notification banner on-screen
     if st.session_state.otp_sent:
+        if st.session_state.method_chosen == "Mobile Number":
+            st.markdown(
+                f"""
+                <div class='notification-banner'>
+                    <p style='margin:0; font-size:0.8rem; color:#ff3300 !important; font-weight:bold; text-transform:uppercase;'>💬 Text Message SMS Notification</p>
+                    <p style='margin:5px 0 0 0; font-size:1.05rem; color:#fff !important; font-family:sans-serif;'>
+                        <strong>Welcome To Aksharam!</strong><br>
+                        Your secure 6-digit mobile verification code is: <span style='color:#ff3300; font-size:1.2rem; font-weight:bold;'>{st.session_state.generated_otp}</span>
+                    </p>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        else:
+            st.info("🎯 OTP code dispatched to your email inbox (or spam folder)!")
+
         st.markdown("---")
         otp_entry = st.text_input("Enter 6-Digit Secure Verification Passcode", placeholder="000000")
 
@@ -141,7 +192,7 @@ if not st.session_state.logged_in:
                 st.success("Access Verified! Welcome to Aksharam.")
                 st.rerun()
             else:
-                st.error("Security code mismatch. Try again or check your email folder.")
+                st.error("Security code mismatch. Try again.")
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -150,23 +201,23 @@ if not st.session_state.logged_in:
 
 SYSTEM_PROMPT = (
     f"Your name is Aksharam, an elite assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
-    f"You are currently assisting {st.session_state.email}. Provide factual, precise, well-structured answers."
+    f"You are currently assisting user ID: {st.session_state.identity}. Provide factual, precise answers."
 )
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    db_res = supabase_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.email}", "order": "id.asc"})
+    db_res = supabase_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"})
     if db_res.status_code == 200:
         for entry in db_res.json():
             st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
 
 with st.sidebar:
-    st.markdown(f"### 👤 Connected:\n`{st.session_state.email}`")
+    st.markdown(f"### 👤 Connected:\n`{st.session_state.identity}`")
     st.markdown("---")
     
     if st.button("🔒 Secure Log Out", use_container_width=True):
         st.session_state.logged_in = False
-        st.session_state.email = ""
+        st.session_state.identity = ""
         st.session_state.otp_sent = False
         st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         st.rerun()
@@ -183,7 +234,7 @@ if user_input := st.chat_input("Interact with Aksharam safely..."):
         st.markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
     
-    supabase_request("chat_logs", "POST", {"email": st.session_state.email, "role": "user", "content": user_input})
+    supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
@@ -203,7 +254,7 @@ if user_input := st.chat_input("Interact with Aksharam safely..."):
             response_placeholder.markdown(full_response)
             
             st.session_state.messages.append({"role": "assistant", "content": full_response})
-            supabase_request("chat_logs", "POST", {"email": st.session_state.email, "role": "assistant", "content": full_response})
+            supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
             
         except Exception as e:
             st.error(f"Cloud Routing Error: {e}")
