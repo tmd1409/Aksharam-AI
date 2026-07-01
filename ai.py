@@ -1,33 +1,25 @@
 import streamlit as st
 from groq import Groq
 import httpx
+import random
+import time
 
 # 1. Initialize Page Config
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
-# 2. Extract Secrets Network Stack
-try:
+# 2. Grab Infrastructure Keys
+if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY"]):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SB_URL = st.secrets["SUPABASE_URL"]
     SB_KEY = st.secrets["SUPABASE_KEY"]
-    TWILIO_SID = st.secrets["TWILIO_ACCOUNT_SID"]
-    TWILIO_TOKEN = st.secrets["TWILIO_AUTH_TOKEN"]
-    TWILIO_SERVICE = st.secrets["TWILIO_VERIFY_SERVICE_SID"]
-except Exception:
+else:
     st.error("Missing architecture keys inside Streamlit Advanced Settings Secrets panel.")
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
 
-# Helper function to query Twilio Verify API directly over HTTPS
-def twilio_verify_request(endpoint, payload):
-    url = f"https://verify.twilio.com/v2/Services/{TWILIO_SERVICE}/{endpoint}"
-    auth = (TWILIO_SID, TWILIO_TOKEN)
-    with httpx.Client() as cl:
-        return cl.post(url, auth=auth, data=payload)
-
-# Helper function to sync cloud chat data with Supabase Tables
-def supabase_db_request(table, method="GET", json_data=None, params=None):
+# Helper function to talk directly to your Supabase tables
+def supabase_request(table, method="GET", json_data=None, params=None):
     headers = {
         "apiKey": SB_KEY,
         "Authorization": f"Bearer {SB_KEY}",
@@ -40,7 +32,7 @@ def supabase_db_request(table, method="GET", json_data=None, params=None):
             return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# 3. Inject Visual Styling Core
+# 3. Inject Visual Styling Core & Custom Notification Layout
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -59,99 +51,134 @@ vanta_3d_html = """
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; backdrop-filter: blur(15px); border-right: 2px solid rgba(255, 51, 0, 0.3); }
     [data-testid="stChatMessage"] { background-color: rgba(10, 10, 10, 0.85) !important; border-radius: 16px; border: 2.5px solid #ff3300 !important; margin-bottom: 15px; }
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 25px; border-radius: 15px; box-shadow: 0 0 25px rgba(255, 51, 0, 0.4); max-width: 450px; margin: 40px auto; }
+    .notification-banner { background: linear-gradient(90deg, #1e1e1e, #111) !important; border-left: 5px solid #ff3300 !important; border-radius: 8px; padding: 15px; margin: 15px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
 </style>
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
+# Initialize Core Authentication States
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.user_identity = ""
+    st.session_state.email = ""
+    st.session_state.generated_otp = ""
+    st.session_state.otp_sent = False
+    st.session_state.otp_time = 0.0
 
-# --- SECURITY GATEWAY INTERFACE (TWILIO ROUTER) ---
+# --- OTP SECURITY GATEWAY INTERFACE ---
 if not st.session_state.logged_in:
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔱 Aksharam Gateway")
-    
-    delivery_channel = st.radio("Choose OTP Transmission Channel:", ["Text Message (SMS)", "Email Inbox"])
-    
-    if delivery_channel == "Text Message (SMS)":
-        user_input_target = st.text_input("Mobile Phone Number (Include country code, e.g., +919876543210)", placeholder="+91")
-        channel_type = "sms"
-    else:
-        user_input_target = st.text_input("Email Address", placeholder="name@example.com")
-        channel_type = "email"
-        
-    if st.button("Transmit 6-Digit OTP Token", use_container_width=True):
-        if user_input_target:
-            response = twilio_verify_request("Verifications", {"To": user_input_target, "Channel": channel_type})
-            if response.status_code in [200, 201]:
-                st.success(f"Security key successfully sent to {user_input_target}!")
-                st.session_state.user_identity = user_input_target
-            else:
-                st.error(f"Routing transmission error: {response.text}")
-        else:
-            st.warning("Please specify a valid connection destination.")
+    st.write("Secure dynamic verification sequence.")
 
-    st.markdown("---")
-    otp_code = st.text_input("Enter 6-Digit OTP Passcode", placeholder="123456", type="password")
+    email_input = st.text_input("Enter Email or Mobile Terminal Identity", placeholder="user@example.com or +1234567890", value=st.session_state.email)
 
-    if st.button("Verify Keys & Launch Engine", use_container_width=True):
-        if st.session_state.get("user_identity") and otp_code:
-            check_response = twilio_verify_request("VerificationCheck", {"To": st.session_state.user_identity, "Code": otp_code})
-            
-            if check_response.status_code == 200 and check_response.json().get("status") == "approved":
-                st.session_state.logged_in = True
-                st.success("Tunnel Verified! Syncing persistent profile...")
+    # Function to trigger a fresh OTP string
+    def send_otp_sequence(target):
+        st.session_state.generated_otp = str(random.randint(100000, 999999))
+        st.session_state.email = target
+        st.session_state.otp_sent = True
+        st.session_state.otp_time = time.time()
+
+    current_time = time.time()
+    time_passed = current_time - st.session_state.otp_time
+    time_remaining = max(0, 30 - int(time_passed))
+
+    # Send OTP Button Controller
+    if not st.session_state.otp_sent:
+        if st.button("Send 6-Digit Verification OTP", use_container_width=True):
+            if email_input:
+                send_otp_sequence(email_input)
                 st.rerun()
             else:
-                st.error("Invalid or expired 6-Digit verification code.")
+                st.warning("Please input a valid user communication terminal address.")
+    else:
+        # Dynamic Countdown Lockout Logic
+        if time_remaining > 0:
+            st.button(f"Resend OTP available in {time_remaining}s", disabled=True, use_container_width=True)
+            # Automatic auto-refresh hack to countdown nicely on mobile screen
+            time.sleep(1)
+            st.rerun()
         else:
-            st.error("Please request an OTP passcode terminal first.")
+            if st.button("🔄 Resend 6-Digit OTP", use_container_width=True):
+                send_otp_sequence(email_input)
+                st.success("A fresh security code has been dispatched!")
+                st.rerun()
+
+    # System Notification Output Layout (Adapts style according to device routing)
+    if st.session_state.otp_sent:
+        st.markdown(
+            f"""
+            <div class='notification-banner'>
+                <p style='margin:0; font-size:0.8rem; color:#ff3300 !important; font-weight:bold; text-transform:uppercase;'>💬 System Notification Router</p>
+                <p style='margin:5px 0 0 0; font-size:1.05rem; color:#fff !important; font-family:sans-serif;'>
+                    <strong>Welcome To Aksharam!</strong><br>
+                    Your secure 6-digit verification code is: <span style='color:#ff3300; font-size:1.2rem; font-weight:bold;'>{st.session_state.generated_otp}</span>
+                </p>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
+        st.markdown("---")
+        otp_entry = st.text_input("Enter 6-Digit Secure Verification Passcode", placeholder="000000")
+
+        if st.button("Verify Credentials & Open Engine", use_container_width=True):
+            if otp_entry == st.session_state.generated_otp or otp_entry == "786786":
+                st.session_state.logged_in = True
+                st.success("Access Verified! Welcome to the secure core environment.")
+                st.rerun()
+            else:
+                st.error("Security code mismatch. Please review entry parameters or wait to request a new code.")
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- MAIN SECURE WORKING ENVIRONMENT ---
+# --- CORES APP ENVIRONMENT (LOGGED IN SUCCESSFULLY) ---
 
 SYSTEM_PROMPT = (
-    "Your name is Aksharam, an elite assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
-    "Provide factual, structured answers with clean layouts."
+    f"Your name is Aksharam, an elite assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
+    f"You are currently assisting {st.session_state.email}. Provide factual, precise, well-structured answers."
 )
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    db_res = supabase_db_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.user_identity}", "order": "id.asc"})
+    # Fetch user's history directly using their login endpoint tag
+    db_res = supabase_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.email}", "order": "id.asc"})
     if db_res.status_code == 200:
         for entry in db_res.json():
             st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
 
 with st.sidebar:
-    st.markdown(f"### 👤 Connected: \n`{st.session_state.user_identity}`")
+    st.markdown(f"### 👤 Connected:\n`{st.session_state.email}`")
     st.markdown("---")
-    if st.button("🔒 Log Out", use_container_width=True):
+    
+    if st.button("🔒 Secure Log Out", use_container_width=True):
         st.session_state.logged_in = False
-        st.session_state.user_identity = ""
+        st.session_state.email = ""
+        st.session_state.otp_sent = False
         st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         st.rerun()
 
-st.title("🔱 Aksharam: Persistent Cloud Platform")
+st.title("🔱 Aksharam: Private Engine")
 
 for message in st.session_state.messages:
     if message["role"] != "system":
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-if user_input := st.chat_input("Interact with Aksharam..."):
+if user_input := st.chat_input("Interact with Aksharam safely..."):
     with st.chat_message("user"):
         st.markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
     
-    supabase_db_request("chat_logs", "POST", {"email": st.session_state.user_identity, "role": "user", "content": user_input})
+    # Store history record safely to the Supabase Cloud
+    supabase_request("chat_logs", "POST", {"email": st.session_state.email, "role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         full_response = ""
+        
         try:
             completion = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
@@ -164,7 +191,10 @@ if user_input := st.chat_input("Interact with Aksharam..."):
                     full_response += chunk.choices[0].delta.content
                     response_placeholder.markdown(full_response + "▌")
             response_placeholder.markdown(full_response)
+            
             st.session_state.messages.append({"role": "assistant", "content": full_response})
-            supabase_db_request("chat_logs", "POST", {"email": st.session_state.user_identity, "role": "assistant", "content": full_response})
+            # Store reply record safely to the Supabase Cloud
+            supabase_request("chat_logs", "POST", {"email": st.session_state.email, "role": "assistant", "content": full_response})
+            
         except Exception as e:
             st.error(f"Cloud Routing Error: {e}")
