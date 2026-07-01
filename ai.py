@@ -8,15 +8,42 @@ import time
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
 # 2. Grab Infrastructure Keys
-if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY"]):
+if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "RESEND_API_KEY"]):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SB_URL = st.secrets["SUPABASE_URL"]
     SB_KEY = st.secrets["SUPABASE_KEY"]
+    RESEND_KEY = st.secrets["RESEND_API_KEY"]
 else:
-    st.error("Missing architecture keys inside Streamlit Advanced Settings Secrets panel.")
+    st.error("Missing architecture keys inside Streamlit Advanced Settings Secrets panel. Make sure RESEND_API_KEY is added!")
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
+
+# Helper function to send actual emails via Resend API
+def send_real_email(to_email, otp_code):
+    url = "https://api.resend.com/emails"
+    headers = {
+        "Authorization": f"Bearer {RESEND_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "from": "Aksharam AI <onboarding@resend.dev>",
+        "to": [to_email],
+        "subject": "🔱 Welcome To Aksharam - Your 6-Digit OTP Verification Passcode",
+        "html": f"""
+        <div style="font-family: sans-serif; padding: 20px; background-color: #000; color: #fff; border: 2px solid #ff3300; border-radius: 12px; max-width: 500px;">
+            <h2 style="color: #ff3300;">Welcome To Aksharam</h2>
+            <p style="font-size: 1.1rem;">Your request to unlock the core engine has been verified.</p>
+            <p style="font-size: 1rem; color: #aaa;">Your secure 6-digit verification code is:</p>
+            <div style="background: #111; padding: 15px; border-radius: 8px; font-size: 2rem; font-weight: bold; letter-spacing: 5px; text-align: center; color: #ff3300; border: 1px dashed #ff3300;">
+                {otp_code}
+            </div>
+            <p style="font-size: 0.8rem; color: #666; margin-top: 20px;">Forged from Theorems, Minds, and Data — engineered by TMD.</p>
+        </div>
+        """
+    }
+    with httpx.Client() as cl:
+        return cl.post(url, headers=headers, json=payload)
 
 # Helper function to talk directly to your Supabase tables
 def supabase_request(table, method="GET", json_data=None, params=None):
@@ -32,7 +59,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
             return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# 3. Inject Visual Styling Core & Custom Notification Layout
+# 3. Inject Visual Styling Core
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -51,7 +78,6 @@ vanta_3d_html = """
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; backdrop-filter: blur(15px); border-right: 2px solid rgba(255, 51, 0, 0.3); }
     [data-testid="stChatMessage"] { background-color: rgba(10, 10, 10, 0.85) !important; border-radius: 16px; border: 2.5px solid #ff3300 !important; margin-bottom: 15px; }
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 25px; border-radius: 15px; box-shadow: 0 0 25px rgba(255, 51, 0, 0.4); max-width: 450px; margin: 40px auto; }
-    .notification-banner { background: linear-gradient(90deg, #1e1e1e, #111) !important; border-left: 5px solid #ff3300 !important; border-radius: 8px; padding: 15px; margin: 15px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
 </style>
 """
@@ -71,65 +97,51 @@ if not st.session_state.logged_in:
     st.title("🔱 Aksharam Gateway")
     st.write("Secure dynamic verification sequence.")
 
-    email_input = st.text_input("Enter Email or Mobile Terminal Identity", placeholder="user@example.com or +1234567890", value=st.session_state.email)
+    email_input = st.text_input("Enter Email Identity Address", placeholder="user@example.com", value=st.session_state.email)
 
-    # Function to trigger a fresh OTP string
     def send_otp_sequence(target):
-        st.session_state.generated_otp = str(random.randint(100000, 999999))
+        otp = str(random.randint(100000, 999999))
+        st.session_state.generated_otp = otp
         st.session_state.email = target
         st.session_state.otp_sent = True
         st.session_state.otp_time = time.time()
+        # Fire the real email out instantly
+        send_real_email(target, otp)
 
     current_time = time.time()
     time_passed = current_time - st.session_state.otp_time
     time_remaining = max(0, 30 - int(time_passed))
 
-    # Send OTP Button Controller
     if not st.session_state.otp_sent:
         if st.button("Send 6-Digit Verification OTP", use_container_width=True):
             if email_input:
                 send_otp_sequence(email_input)
+                st.success("OTP dispatched! Check your email inbox (and spam folder).")
                 st.rerun()
             else:
-                st.warning("Please input a valid user communication terminal address.")
+                st.warning("Please input a valid email terminal address.")
     else:
-        # Dynamic Countdown Lockout Logic
         if time_remaining > 0:
             st.button(f"Resend OTP available in {time_remaining}s", disabled=True, use_container_width=True)
-            # Automatic auto-refresh hack to countdown nicely on mobile screen
             time.sleep(1)
             st.rerun()
         else:
             if st.button("🔄 Resend 6-Digit OTP", use_container_width=True):
                 send_otp_sequence(email_input)
-                st.success("A fresh security code has been dispatched!")
+                st.success("A fresh security code has been dispatched to your inbox!")
                 st.rerun()
 
-    # System Notification Output Layout (Adapts style according to device routing)
     if st.session_state.otp_sent:
-        st.markdown(
-            f"""
-            <div class='notification-banner'>
-                <p style='margin:0; font-size:0.8rem; color:#ff3300 !important; font-weight:bold; text-transform:uppercase;'>💬 System Notification Router</p>
-                <p style='margin:5px 0 0 0; font-size:1.05rem; color:#fff !important; font-family:sans-serif;'>
-                    <strong>Welcome To Aksharam!</strong><br>
-                    Your secure 6-digit verification code is: <span style='color:#ff3300; font-size:1.2rem; font-weight:bold;'>{st.session_state.generated_otp}</span>
-                </p>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-
         st.markdown("---")
         otp_entry = st.text_input("Enter 6-Digit Secure Verification Passcode", placeholder="000000")
 
         if st.button("Verify Credentials & Open Engine", use_container_width=True):
             if otp_entry == st.session_state.generated_otp or otp_entry == "786786":
                 st.session_state.logged_in = True
-                st.success("Access Verified! Welcome to the secure core environment.")
+                st.success("Access Verified! Welcome to Aksharam.")
                 st.rerun()
             else:
-                st.error("Security code mismatch. Please review entry parameters or wait to request a new code.")
+                st.error("Security code mismatch. Try again or check your email folder.")
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -143,7 +155,6 @@ SYSTEM_PROMPT = (
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    # Fetch user's history directly using their login endpoint tag
     db_res = supabase_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.email}", "order": "id.asc"})
     if db_res.status_code == 200:
         for entry in db_res.json():
@@ -172,7 +183,6 @@ if user_input := st.chat_input("Interact with Aksharam safely..."):
         st.markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
     
-    # Store history record safely to the Supabase Cloud
     supabase_request("chat_logs", "POST", {"email": st.session_state.email, "role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
@@ -193,7 +203,6 @@ if user_input := st.chat_input("Interact with Aksharam safely..."):
             response_placeholder.markdown(full_response)
             
             st.session_state.messages.append({"role": "assistant", "content": full_response})
-            # Store reply record safely to the Supabase Cloud
             supabase_request("chat_logs", "POST", {"email": st.session_state.email, "role": "assistant", "content": full_response})
             
         except Exception as e:
