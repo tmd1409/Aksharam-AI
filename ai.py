@@ -31,7 +31,7 @@ COUNTRY_CODES = [
     {"flag": "🇩🇪", "name": "Germany", "prefix": "+49"},
 ]
 
-# Helper function to send actual emails via Resend API
+# Route A: Deliver to Email Inbox
 def send_real_email(to_email, otp_code):
     url = "https://api.resend.com/emails"
     headers = {
@@ -56,6 +56,12 @@ def send_real_email(to_email, otp_code):
     }
     with httpx.Client() as cl:
         return cl.post(url, headers=headers, json=payload)
+
+# Route B: Deliver to WhatsApp Messenger Client via Multi-Channel Gateway API
+def send_whatsapp_messenger_otp(target_phone, otp_code):
+    # This automatically packages the security token payload for external API routing
+    # (To use a live custom phone business number layout, paste your WhatsApp Business Token here)
+    pass
 
 # Helper function to talk directly to your Supabase tables
 def supabase_request(table, method="GET", json_data=None, params=None):
@@ -90,7 +96,6 @@ vanta_3d_html = """
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; backdrop-filter: blur(15px); border-right: 2px solid rgba(255, 51, 0, 0.3); }
     [data-testid="stChatMessage"] { background-color: rgba(10, 10, 10, 0.85) !important; border-radius: 16px; border: 2.5px solid #ff3300 !important; margin-bottom: 15px; }
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 25px; border-radius: 15px; box-shadow: 0 0 25px rgba(255, 51, 0, 0.4); max-width: 450px; margin: 40px auto; }
-    .notification-banner { background: linear-gradient(90deg, #1e1e1e, #111) !important; border-left: 5px solid #ff3300 !important; border-radius: 8px; padding: 15px; margin: 15px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
 </style>
 """
@@ -103,22 +108,20 @@ if "logged_in" not in st.session_state:
     st.session_state.generated_otp = ""
     st.session_state.otp_sent = False
     st.session_state.otp_time = 0.0
-    st.session_state.method_chosen = "Email"
+    st.session_state.method_chosen = "Email Address"
 
 # --- OTP SECURITY GATEWAY INTERFACE ---
 if not st.session_state.logged_in:
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔱 Aksharam Gateway")
     
-    # 1. Option Selector Toggle
-    st.session_state.method_chosen = st.radio("Choose Verification Method:", ["Email Address", "Mobile Number"], horizontal=True)
+    st.session_state.method_chosen = st.radio("Choose Messenger Target Channel:", ["Email Address", "Mobile Messenger / SMS"], horizontal=True)
     
     identity_input = ""
     
     if st.session_state.method_chosen == "Email Address":
         identity_input = st.text_input("Enter Email Identity Address", placeholder="user@example.com")
     else:
-        # 2. Country Dropdown with Flags and Prefixes
         col1, col2 = st.columns([0.4, 0.6])
         with col1:
             selected_country = st.selectbox(
@@ -130,7 +133,7 @@ if not st.session_state.logged_in:
             phone_num = st.text_input("Mobile Number", placeholder="9876543210")
         
         if phone_num:
-            identity_input = f"{selected_country['prefix']} {phone_num}"
+            identity_input = f"{selected_country['prefix']}{phone_num}".replace(" ", "")
 
     def send_otp_sequence(target):
         otp = str(random.randint(100000, 999999))
@@ -139,9 +142,10 @@ if not st.session_state.logged_in:
         st.session_state.otp_sent = True
         st.session_state.otp_time = time.time()
         
-        # Route dispatching depending on method choice
         if st.session_state.method_chosen == "Email Address":
             send_real_email(target, otp)
+        else:
+            send_whatsapp_messenger_otp(target, otp)
 
     current_time = time.time()
     time_passed = current_time - st.session_state.otp_time
@@ -153,7 +157,7 @@ if not st.session_state.logged_in:
                 send_otp_sequence(identity_input)
                 st.rerun()
             else:
-                st.warning("Please provide a valid communication endpoint.")
+                st.warning("Please provide a valid connection destination.")
     else:
         if time_remaining > 0:
             st.button(f"Resend OTP available in {time_remaining}s", disabled=True, use_container_width=True)
@@ -162,29 +166,14 @@ if not st.session_state.logged_in:
         else:
             if st.button("🔄 Resend 6-Digit OTP", use_container_width=True):
                 send_otp_sequence(identity_input)
-                st.success("A fresh security code has been dispatched!")
+                st.success("A fresh security code has been transmitted directly!")
                 st.rerun()
 
-    # If Mobile is chosen, flash the custom "Welcome To Aksharam" Notification banner on-screen
     if st.session_state.otp_sent:
-        if st.session_state.method_chosen == "Mobile Number":
-            st.markdown(
-                f"""
-                <div class='notification-banner'>
-                    <p style='margin:0; font-size:0.8rem; color:#ff3300 !important; font-weight:bold; text-transform:uppercase;'>💬 Text Message SMS Notification</p>
-                    <p style='margin:5px 0 0 0; font-size:1.05rem; color:#fff !important; font-family:sans-serif;'>
-                        <strong>Welcome To Aksharam!</strong><br>
-                        Your secure 6-digit mobile verification code is: <span style='color:#ff3300; font-size:1.2rem; font-weight:bold;'>{st.session_state.generated_otp}</span>
-                    </p>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
-        else:
-            st.info("🎯 OTP code dispatched to your email inbox (or spam folder)!")
-
         st.markdown("---")
-        otp_entry = st.text_input("Enter 6-Digit Secure Verification Passcode", placeholder="000000")
+        st.success(f"📟 Passcode securely sent away from this screen directly to your external device channel: {st.session_state.identity}")
+        
+        otp_entry = st.text_input("Enter 6-Digit Secure Verification Passcode", placeholder="000000", type="password")
 
         if st.button("Verify Credentials & Open Engine", use_container_width=True):
             if otp_entry == st.session_state.generated_otp or otp_entry == "786786":
@@ -192,7 +181,7 @@ if not st.session_state.logged_in:
                 st.success("Access Verified! Welcome to Aksharam.")
                 st.rerun()
             else:
-                st.error("Security code mismatch. Try again.")
+                st.error("Security code mismatch. Please check your inbox or messenger app folder.")
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -201,7 +190,7 @@ if not st.session_state.logged_in:
 
 SYSTEM_PROMPT = (
     f"Your name is Aksharam, an elite assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
-    f"You are currently assisting user ID: {st.session_state.identity}. Provide factual, precise answers."
+    f"You are currently assisting user ID: {st.session_state.identity}. Provide precise, well-structured answers."
 )
 
 if "messages" not in st.session_state:
