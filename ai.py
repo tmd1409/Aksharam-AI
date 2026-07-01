@@ -22,12 +22,8 @@ else:
 
 client = Groq(api_key=GROQ_KEY)
 
-# CRITICAL FIX: Safe initialization of the Cookie Manager with a structural unique key
-@st.cache_resource
-def get_cookie_manager():
-    return stx.CookieManager(key="aksharam_cookies_secure_layer")
-
-cookie_manager = get_cookie_manager()
+# FIX: Initialize the cookie manager directly without decorators to stop the CachedWidgetWarning
+cookie_manager = stx.CookieManager(key="aksharam_cookies_secure_layer_v2")
 
 COUNTRY_CODES = [
     {"flag": "🇮🇳", "name": "India", "prefix": "+91"},
@@ -100,10 +96,13 @@ if "generated_otp" not in st.session_state:
 if "otp_time" not in st.session_state:
     st.session_state.otp_time = 0.0
 
-# Fetch device browser profile safely
-saved_user = cookie_manager.get("aksharam_user")
-saved_ident = cookie_manager.get("aksharam_ident")
-saved_secret = cookie_manager.get("aksharam_secret")
+# Fetch device browser profile safely without caching rules interference
+try:
+    saved_user = cookie_manager.get("aksharam_user")
+    saved_ident = cookie_manager.get("aksharam_ident")
+    saved_secret = cookie_manager.get("aksharam_secret")
+except Exception:
+    saved_user, saved_ident, saved_secret = None, None, None
 
 if saved_user and saved_ident and saved_secret and st.session_state.app_mode == "Gateway":
     st.session_state.app_mode = "Already_Logged_In"
@@ -127,12 +126,15 @@ if st.session_state.app_mode == "Already_Logged_In":
                 st.session_state.app_mode = "Connected"
                 st.rerun()
             else:
-                st.error("Incorrect password assertion matrix verification failed.")
+                st.error("Incorrect password verification failed.")
     with col2:
         if st.button("Switch Account 👤", use_container_width=True):
-            cookie_manager.delete("aksharam_user")
-            cookie_manager.delete("aksharam_ident")
-            cookie_manager.delete("aksharam_secret")
+            try:
+                cookie_manager.delete("aksharam_user")
+                cookie_manager.delete("aksharam_ident")
+                cookie_manager.delete("aksharam_secret")
+            except Exception:
+                pass
             st.session_state.app_mode = "Gateway"
             st.rerun()
             
@@ -240,10 +242,12 @@ elif st.session_state.app_mode == "OTP_Screen":
             
     if st.button("Verify Credentials & Deploy Core", use_container_width=True):
         if full_user_otp == st.session_state.generated_otp or full_user_otp == "786786":
-            # Direct cache injection via Universal cookie controller
-            cookie_manager.set("aksharam_user", st.session_state.username)
-            cookie_manager.set("aksharam_ident", st.session_state.identity)
-            cookie_manager.set("aksharam_secret", st.session_state.saved_pass)
+            try:
+                cookie_manager.set("aksharam_user", st.session_state.username)
+                cookie_manager.set("aksharam_ident", st.session_state.identity)
+                cookie_manager.set("aksharam_secret", st.session_state.saved_pass)
+            except Exception:
+                pass
             
             st.session_state.app_mode = "Connected"
             st.success("Verification successful!")
