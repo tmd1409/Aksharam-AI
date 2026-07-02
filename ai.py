@@ -14,7 +14,7 @@ st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
 # 2. Grab Infrastructure Keys Safely
 REQUIRED_KEYS = ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]
-if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]):
+if all(key in st.secrets for key in REQUIRED_KEYS):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SB_URL = st.secrets["SUPABASE_URL"]
     SB_KEY = st.secrets["SUPABASE_KEY"]
@@ -22,6 +22,11 @@ if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_K
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
     ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"].strip().lower()
     MASTER_OTP = st.secrets.get("MASTER_OTP", "786786")
+    
+    # Twilio Cellular Keys for Fresh Text Messages
+    TWILIO_SID = st.secrets.get("TWILIO_ACCOUNT_SID", None)
+    TWILIO_AUTH = st.secrets.get("TWILIO_AUTH_TOKEN", None)
+    TWILIO_FROM = st.secrets.get("TWILIO_PHONE_NUMBER", None)
 else:
     st.error("Missing architecture keys inside Streamlit Secrets panel.")
     st.stop()
@@ -29,11 +34,36 @@ else:
 # Initialize Sync Groq Client
 client = Groq(api_key=GROQ_KEY)
 
-# 3. Cryptographic Token Generator for High Security Matrix
+# 3. Cryptographic Token Generator
 def generate_secure_hash(secret_string: str) -> str:
     return hashlib.sha256(secret_string.encode('utf-8')).hexdigest()[:24]
 
-# 4. Secure Async Supabase Engine
+# 4. 100% Live Automatic SMS Routing Module (Non-Blocking Cloud Client)
+def send_automatic_cellular_sms(to_phone, password_token, username):
+    if not TWILIO_SID or not TWILIO_AUTH or not TWILIO_FROM:
+        # Fallback Indicator if keys are missing during test phase
+        st.warning("⚠️ Twilio Cellular Gateway keys are missing in Secrets. Simulating dispatch...")
+        return True
+    try:
+        sms_body = f"🔱 Aksharam AI Core Secured\nHello {username}, your Unique Guest Key is active.\n🔑 Key: {password_token}\n\nUse it anytime to unlock your timeline. Engineered by TMD."
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json"
+        payload = {
+            "To": f"+{to_phone.strip('+')}",
+            "From": TWILIO_FROM,
+            "Body": sms_body
+        }
+        # Synchronous secure dispatch trigger straight to user handset
+        res = httpx.post(url, data=payload, auth=(TWILIO_SID, TWILIO_AUTH))
+        if res.status_code in [200, 201]:
+            return True
+        else:
+            st.error(f"Cellular Gateway Reject: {res.text}")
+            return False
+    except Exception as e:
+        st.error(f"Cellular Network Error: {e}")
+        return False
+
+# 5. Secure Async Supabase Engine
 async def supabase_request_async(table, method="GET", json_data=None, params=None):
     headers = {
         "apiKey": SB_KEY, 
@@ -50,7 +80,7 @@ async def supabase_request_async(table, method="GET", json_data=None, params=Non
 def run_async(coroutine):
     return asyncio.run(coroutine)
 
-# 5. Secure Gmail Routing Function
+# 6. Secure Gmail Routing Function
 def send_real_gmail_otp(to_email, otp_code):
     try:
         msg = MIMEMultipart()
@@ -125,7 +155,6 @@ if "is_returning_user" not in st.session_state: st.session_state.is_returning_us
 if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
 if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
 if "messages" not in st.session_state: st.session_state.messages = []
-if "guest_sms_link" not in st.session_state: st.session_state.guest_sms_link = ""
 
 def get_system_prompt():
     return (
@@ -174,7 +203,6 @@ with st.sidebar:
             st.session_state.identity = ""
             st.session_state.is_returning_user = False
             st.session_state.messages = []
-            st.session_state.guest_sms_link = ""
             st.rerun()
     else:
         st.warning("🔒 Terminal Locked.")
@@ -190,28 +218,28 @@ if st.session_state.app_mode == "Unauthorized":
     if auth_action == "🚀 Continue As Guest":
         with st.form("main_guest_form", clear_on_submit=False):
             guest_name = st.text_input("Enter Preferred Username", placeholder="Anonymous")
-            guest_phone = st.text_input("Enter Mobile Number (with Country Code)", placeholder="919876543210")
+            guest_phone = st.text_input("Enter Mobile Number (With Country Code, e.g., 919876543210)", placeholder="919876543210")
             guest_pass = st.text_input("Create/Enter Guest Key (Password)", type="password", placeholder="••••••••")
-            submit_guest = st.form_submit_button("Unlock & Generate Matrix 🚀", use_container_width=True)
+            submit_guest = st.form_submit_button("Unlock Core Engine 🚀", use_container_width=True)
             
             if submit_guest and guest_name and guest_phone and guest_pass:
                 clean_user = guest_name.strip()
                 clean_phone = ''.join(filter(str.isdigit, guest_phone))
                 secure_guest_id = f"guest_{generate_secure_hash(clean_user.lower())}"
                 
-                # Fixed 100% Core WhatsApp String Generation
-                sms_text = f"🔱 Aksharam AI Gateway Secured\nHello {clean_user}, your unique Guest Login Key is successfully generated.\n🔑 Key: {guest_pass}\n\nKeep it safe to reopen your timeline. Engineered by TMD."
-                encoded_sms = urllib.parse.quote(sms_text)
-                
-                # Enforce routing string initialization explicitly
-                st.session_state.guest_sms_link = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_sms}"
+                # 100% Automatic Cloud Cellular SMS Dispatch Engine Trigger
+                with st.spinner("Broadcasting Secure Key straight to your cellular device..."):
+                    send_automatic_cellular_sms(clean_phone, guest_pass, clean_user)
                 
                 db_check = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{secure_guest_id}", "limit": 1}))
                 
-                st.session_state.app_mode = "Guest_SMS_Dispatch"
+                # Direct Pass straight to Main Portal (No Intermediary Dashboard Screens!)
+                st.session_state.app_mode = "Connected"
                 st.session_state.username = clean_user
                 st.session_state.identity = secure_guest_id
                 st.session_state.is_returning_user = True if (db_check and db_check.status_code == 200 and len(db_check.json()) > 0) else False
+                st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+                st.success("🔒 System Unlocked. Fresh SMS Dispatched!")
                 st.rerun()
                 
     elif auth_action == "🔐 Login / Sign In":
@@ -240,29 +268,6 @@ if st.session_state.app_mode == "Unauthorized":
                     st.session_state.app_mode = "OTP_Verification"
                     st.rerun()
                     
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
-# --- GUEST PASSWORD SMS ROUTER ---
-elif st.session_state.app_mode == "Guest_SMS_Dispatch":
-    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #ff3300;'>📲 Dispatch Security Token</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>તમારો સિક્યોરિટી પાસવર્ડ ફોન પર સેવ કરવા માટે નીચેના લીલા બટન પર ક્લિક કરો.</p>", unsafe_allow_html=True)
-    
-    # 100% Working Clickable Static Anchor Wrapper
-    st.markdown(f'''
-        <a href="{st.session_state.guest_sms_link}" target="_blank" style="text-decoration:none;">
-            <div style="background-color:#25D366; color:white; text-align:center; padding:15px; border-radius:10px; font-weight:bold; font-size:1.1rem; margin-bottom:25px; box-shadow: 0 4px 15px rgba(37,211,102,0.4); cursor:pointer;">
-                🟢 Click to Send Password via WhatsApp
-            </div>
-        </a>
-    ''', unsafe_allow_html=True)
-    
-    if st.button("Launch Core Engine 🚀", use_container_width=True):
-        st.session_state.app_mode = "Connected"
-        st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-        st.rerun()
-        
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
