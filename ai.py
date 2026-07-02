@@ -242,4 +242,4 @@ elif st.session_state.app_mode == "OTP_Screen":
             st.success("Verification complete!")
             st.rerun()
         else:
-            st.error("Security authorization passcode mismatch
+            st.error("Security authorization passcode mismatch")
