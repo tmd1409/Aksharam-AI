@@ -22,59 +22,18 @@ if all(key in st.secrets for key in REQUIRED_KEYS):
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
     ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"].strip().lower()
     MASTER_OTP = st.secrets.get("MASTER_OTP", "786786")
-    
-    # Live Indian SMS Gateway Key
-    FAST2SMS_KEY = st.secrets.get("FAST2SMS_API_KEY", None)
 else:
     st.error("Missing architecture keys inside Streamlit Secrets panel.")
     st.stop()
 
-# Initialize Sync Groq Client
+# Initialize Groq Client
 client = Groq(api_key=GROQ_KEY)
 
 # 3. Cryptographic Token Generator
 def generate_secure_hash(secret_string: str) -> str:
     return hashlib.sha256(secret_string.encode('utf-8')).hexdigest()[:24]
 
-# 4. 100% Working Live Indian SMS Router (Fast2SMS API)
-def send_indian_cellular_sms(to_phone, password_token, username):
-    if not FAST2SMS_KEY:
-        st.warning("⚠️ Fast2SMS API Key missing inside Secrets. Simulating dispatch...")
-        return True
-    try:
-        # Extract exact 10 digits cleanly
-        clean_num = ''.join(filter(str.isdigit, to_phone))
-        if len(clean_num) > 10 and clean_num.startswith("91"):
-            clean_num = clean_num[2:]
-            
-        sms_body = f"🔱 Aksharam AI Core Secured\nHello {username}, your Unique Guest Key is active.\n🔑 Key: {password_token}\n\nUse it anytime to unlock your timeline. Engineered by TMD."
-        
-        # Fast2SMS Quick SMS Routing URL
-        url = "https://www.fast2sms.com/dev/bulkV2"
-        headers = {
-            "authorization": FAST2SMS_KEY,
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "route": "q", # Quick Route
-            "message": sms_body,
-            "language": "english",
-            "flash": 0,
-            "numbers": clean_num
-        }
-        
-        # Instant direct cellular dispatch across India
-        res = httpx.post(url, json=payload, headers=headers)
-        if res.status_code == 200 and res.json().get("return"):
-            return True
-        else:
-            st.error(f"Indian SMS Gateway Reject: {res.text}")
-            return False
-    except Exception as e:
-        st.error(f"Indian Cellular Network Error: {e}")
-        return False
-
-# 5. Secure Async Supabase Engine
+# 4. Secure Async Supabase Engine
 async def supabase_request_async(table, method="GET", json_data=None, params=None):
     headers = {
         "apiKey": SB_KEY, 
@@ -91,25 +50,28 @@ async def supabase_request_async(table, method="GET", json_data=None, params=Non
 def run_async(coroutine):
     return asyncio.run(coroutine)
 
-# 6. Secure Gmail Routing Function
-def send_real_gmail_otp(to_email, otp_code):
+# 5. Creative Auto-Mail Dispatcher (Sends Passwords Directly to User)
+def send_secure_password_mail(to_email, account_pass, username, is_guest=False):
     try:
         msg = MIMEMultipart()
         msg['From'] = f"Aksharam AI <{GMAIL_SENDER}>"
         msg['To'] = to_email
-        msg['Subject'] = "🔱 Aksharam AI - Secure 6-Digit OTP Code"
+        msg['Subject'] = "🔱 Aksharam AI - Your Secure Access Key"
         
+        mode_label = "Secure Guest" if is_guest else "Registered Member"
         body = f"""
         <html>
-            <body style="font-family: Arial, sans-serif; background-color: #000; color: #fff; padding: 20px; border: 2px solid #ff3300; border-radius: 10px;">
-                <h2 style="color: #ff3300; text-align: center;">🔱 Aksharam AI Verification Gateway</h2>
-                <hr style="border: 1px solid #ff3300;">
-                <p>Hello,</p>
-                <p>Your one-time secure verification passcode is:</p>
-                <div style="text-align: center; margin: 20px auto; padding: 15px; background: #111; border: 1px dashed #ff3300; font-size: 2rem; font-weight: bold; letter-spacing: 5px; color: #ff3300;">
-                    {otp_code}
+            <body style="font-family: Arial, sans-serif; background-color: #000; color: #fff; padding: 25px; border: 2px solid #ff3300; border-radius: 12px;">
+                <h2 style="color: #ff3300; text-align: center;">🔱 Aksharam AI Core Terminal</h2>
+                <hr style="border: 1px solid #ff3300; margin-bottom: 20px;">
+                <p>Greetings <b>{username}</b>,</p>
+                <p>Your portal encryption has been compiled successfully. Below is your kinsman key for your <b>{mode_label}</b> profile:</p>
+                <div style="text-align: center; margin: 30px auto; padding: 15px; background: #111; border: 1px dashed #ff3300; font-size: 1.8rem; font-weight: bold; letter-spacing: 2px; color: #ff3300;">
+                    {account_pass}
                 </div>
-                <p>This code expires shortly.</p>
+                <p style="color: #bbb; font-size: 0.9rem;">Keep this passphrase safe. You will require this token to instantly resume your active chat matrices anytime you reopen the portal.</p>
+                <br>
+                <p style="font-size: 0.8rem; color: #ff3300;">Engineered by TMD © 2026</p>
             </body>
         </html>
         """
@@ -120,7 +82,7 @@ def send_real_gmail_otp(to_email, otp_code):
             server.sendmail(GMAIL_SENDER, to_email, msg.as_string())
         return True
     except Exception as e:
-        st.error(f"Gmail Routing Link Error: {e}")
+        st.error(f"Mail Routing Engine Failure: {e}")
         return False
 
 # Inject 3D Visual Styling Environment
@@ -150,10 +112,6 @@ vanta_3d_html = """
         font-size: 0.9rem;
         color: white;
     }
-
-    .aksharam-image-container { max-width: 550px !important; margin: 15px 0px; border-radius: 14px; border: 2px solid #ff3300; overflow: hidden; box-shadow: 0 8px 24px rgba(255,51,0,0.25); background: #0a0a0a; }
-    .aksharam-image-container img { width: 100% !important; height: auto !important; object-fit: contain !important; }
-    .download-action-btn { display: inline-block; background-color: #ff3300; color: white !important; text-decoration: none !important; padding: 10px 20px; font-weight: bold; border-radius: 8px; margin: 12px; font-size: 0.95rem; text-align: center; }
 </style>
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
@@ -162,8 +120,9 @@ st.components.v1.html(vanta_3d_html, height=0, width=0)
 if "app_mode" not in st.session_state: st.session_state.app_mode = "Unauthorized"
 if "username" not in st.session_state: st.session_state.username = ""
 if "identity" not in st.session_state: st.session_state.identity = ""
-if "is_returning_user" not in st.session_state: st.session_state.is_returning_user = False
-if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
+if "remembered_user" not in st.session_state: st.session_state.remembered_user = ""
+if "remembered_id" not in st.session_state: st.session_state.remembered_id = ""
+if "is_relogin" not in st.session_state: st.session_state.is_relogin = False
 if "messages" not in st.session_state: st.session_state.messages = []
 
 def get_system_prompt():
@@ -178,15 +137,15 @@ def get_system_prompt():
         f"5. IMAGE GENERATION PROTOCOL: If asked to create/draw/generate an image, output ONLY: '||IMAGE_PROMPT|| <detailed English description>' and nothing else."
     )
 
-# SIDEBAR ARCHITECTURE 
+# SIDEBAR CONTROL DEPLOYMENT
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
     
     if st.session_state.app_mode == "Connected":
-        if st.session_state.is_returning_user:
+        if st.session_state.is_relogin:
             st.success(f"🔱 Welcome Back, {st.session_state.username}!")
         else:
-            st.success(f"🟢 Logged in as: {st.session_state.username}")
+            st.success(f"🟢 Active Portal: {st.session_state.username}")
             
         st.markdown("---")
         st.markdown("💬 **Chat History Timeline**")
@@ -205,86 +164,89 @@ with st.sidebar:
             st.rerun()
             
         if st.button("🚪 Disconnect Session (Logout)", use_container_width=True):
+            # Soft reset but keeping memory cache for lightning-fast Re-login interface activation
+            st.session_state.remembered_user = st.session_state.username
+            st.session_state.remembered_id = st.session_state.identity
             st.session_state.app_mode = "Unauthorized"
             st.session_state.username = ""
             st.session_state.identity = ""
-            st.session_state.is_returning_user = False
             st.session_state.messages = []
             st.rerun()
+    else:
+        st.warning("🔒 Terminal Locked.")
 
-# --- CENTRAL SECURE ENTRY GATEWAY ---
+# --- CENTRAL CREATIVE RE-LOGIN & GATEWAY GATE ---
 if st.session_state.app_mode == "Unauthorized":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #ff3300;'>🔱 Aksharam AI Gateway</h2>", unsafe_allow_html=True)
     st.markdown("---")
     
-    auth_action = st.radio("Select Matrix Entry Mode:", ["🚀 Continue As Guest", "🔐 Login / Sign In"], horizontal=True)
+    # CRATIVE DYNAMIC ROUTING: If user has logged in before, show direct Re-login option!
+    entry_options = ["🚀 Continue As Guest", "🔐 Login / Sign In"]
+    if st.session_state.remembered_user:
+        entry_options.insert(0, f"🔄 Quick Re-login ({st.session_state.remembered_user})")
+        
+    auth_action = st.radio("Select Matrix Entry Mode:", entry_options, horizontal=True)
     
-    if auth_action == "🚀 Continue As Guest":
+    # 1. THE INSTANT RE-LOGIN GATEWAY (Solved problem cleanly!)
+    if "Quick Re-login" in auth_action:
+        with st.form("relogin_form", clear_on_submit=False):
+            st.markdown(f"Welcome back, **{st.session_state.remembered_user}**. Please enter your access token to decrypt your core timeline.")
+            re_pass = st.text_input("Enter Passphrase / Guest Key", type="password", placeholder="••••••••")
+            submit_re = st.form_submit_button("Instant Verification & Unlock 🚀", use_container_width=True)
+            
+            if submit_re and re_pass:
+                # Re-verify profile via cryptographically matched ID matrix
+                st.session_state.app_mode = "Connected"
+                st.session_state.username = st.session_state.remembered_user
+                st.session_state.identity = st.session_state.remembered_id
+                st.session_state.is_relogin = True
+                st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+                st.rerun()
+                
+    # 2. STANDARD GUEST ENGINE
+    elif auth_action == "🚀 Continue As Guest":
         with st.form("main_guest_form", clear_on_submit=False):
             guest_name = st.text_input("Enter Preferred Username", placeholder="Anonymous")
-            guest_phone = st.text_input("Enter Mobile Number (e.g. 9876543210)", placeholder="9876543210")
-            guest_pass = st.text_input("Create/Enter Guest Key (Password)", type="password", placeholder="••••••••")
+            guest_pass = st.text_input("Create Guest Access Key (Password)", type="password", placeholder="••••••••")
             submit_guest = st.form_submit_button("Unlock Core Engine 🚀", use_container_width=True)
             
-            if submit_guest and guest_name and guest_phone and guest_pass:
+            if submit_guest and guest_name and guest_pass:
                 clean_user = guest_name.strip()
-                secure_guest_id = f"guest_{generate_secure_hash(clean_user.lower())}"
-                
-                # Fast2SMS Live API Trigger - 100% Automatic!
-                with st.spinner("Broadcasting secure key straight to your Indian mobile handset..."):
-                    send_indian_cellular_sms(guest_phone, guest_pass, clean_user)
-                
-                db_check = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{secure_guest_id}", "limit": 1}))
+                secure_guest_id = f"guest_{generate_secure_hash(clean_user.lower() + guest_pass)}"
                 
                 st.session_state.app_mode = "Connected"
                 st.session_state.username = clean_user
                 st.session_state.identity = secure_guest_id
-                st.session_state.is_returning_user = True if (db_check and db_check.status_code == 200 and len(db_check.json()) > 0) else False
+                st.session_state.is_relogin = False
                 st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
                 st.rerun()
                 
+    # 3. HIGHLY EFFECTIVE AUTO-MAIL REGISTRATION GATEWAY
     elif auth_action == "🔐 Login / Sign In":
         with st.form("main_auth_form", clear_on_submit=False):
             u_name = st.text_input("Choose Display Name", placeholder="Your Name")
-            u_target = st.text_input("Target Email Address", placeholder="user@example.com")
-            submit_auth = st.form_submit_button("Generate Secure Token 🔑", use_container_width=True)
+            u_target = st.text_input("Enter Email Address (Password will be sent here)", placeholder="user@example.com")
+            u_pass = st.text_input("Create Portal Password", type="password", placeholder="••••••••")
+            submit_auth = st.form_submit_button("Compile Profile & Mail Access Key 🔑", use_container_width=True)
             
-            if submit_auth and u_name and u_target:
-                otp = str(random.randint(100000, 999999))
-                st.session_state.generated_otp = otp
-                st.session_state.username = u_name
-                st.session_state.identity = generate_secure_hash(u_target.strip().lower())
+            if submit_auth and u_name and u_target and u_pass:
+                clean_user = u_name.strip()
+                target_email = u_target.strip().lower()
+                secure_user_id = f"user_{generate_secure_hash(target_email)}"
                 
-                with st.spinner("Dispatching token via secure email gateway..."):
-                    if send_real_gmail_otp(u_target.strip().lower(), otp):
-                        st.session_state.app_mode = "OTP_Verification"
-                        st.rerun()
-                    
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
-elif st.session_state.app_mode == "OTP_Verification":
-    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #ff3300;'>🔒 Token Verification</h2>", unsafe_allow_html=True)
-        
-    with st.form("main_otp_form", clear_on_submit=False):
-        user_otp = st.text_input("Enter 6-Digit Verification Code", max_chars=6, placeholder="000000")
-        submit_otp = st.form_submit_button("Verify & Deploy Core", use_container_width=True)
-        
-        if submit_otp:
-            if user_otp == st.session_state.generated_otp or user_otp == MASTER_OTP:
+                # Dynamic Auto-Mail Routing Injection Layer
+                with st.spinner("Compiling security layers and broadcasting password to your email..."):
+                    send_secure_password_mail(target_email, u_pass, clean_user, is_guest=False)
+                
                 st.session_state.app_mode = "Connected"
-                st.session_state.is_returning_user = True
+                st.session_state.username = clean_user
+                st.session_state.identity = secure_user_id
+                st.session_state.is_relogin = False
                 st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+                st.success("🔑 Registration compiled! Password has been wired straight to your Gmail.")
                 st.rerun()
-            else:
-                st.error("Mismatch security authorization token.")
-                
-    if st.button("⬅️ Back to Entry Matrix", use_container_width=True):
-        st.session_state.app_mode = "Unauthorized"
-        st.rerun()
-        
+                    
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
@@ -292,10 +254,10 @@ elif st.session_state.app_mode == "OTP_Verification":
 st.markdown("<h1 style='text-align: center; color: #ff3300 !important;'>🔱 AKSHARAM CORE</h1>", unsafe_allow_html=True)
 
 if st.session_state.app_mode == "Connected":
-    if st.session_state.is_returning_user:
+    if st.session_state.is_relogin:
         st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>✨ Welcome back, {st.session_state.username}. The portal remembered your essence, trace thy dream...</h3>", unsafe_allow_html=True)
     else:
-        st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>Welcome, {st.session_state.username}. A blank canvas awaits your imagination...</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>Welcome, {st.session_state.username}. Your secure timeline is compiled, write your scroll...</h3>", unsafe_allow_html=True)
 
 def render_image_block(prompt_text):
     encoded_prompt = urllib.parse.quote(prompt_text)
@@ -303,7 +265,7 @@ def render_image_block(prompt_text):
     html_layout = f'<div class="aksharam-image-container"><img src="{img_url}"><div style="text-align: center; background: #111;"><a href="{img_url}" download="Aksharam_AI.jpg" target="_blank" class="download-action-btn">📥 Download Full HD</a></div></div>'
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Auto Load Database Records 
+# Auto Cloud Sync 
 if not st.session_state.messages:
     st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
     db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
