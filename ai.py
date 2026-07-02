@@ -328,11 +328,12 @@ for idx, message in enumerate(st.session_state.messages):
                 render_image_block(clean_prompt)
             else:
                 if message["role"] == "user":
-                    # Plain view format for your questions (No copy blocks at all)
                     st.markdown(message["content"])
                 elif message["role"] == "assistant":
-                    # Clean format for Aksharam answers using native, clean code styling with built-in copy icons
-                    st.code(message["content"], language="markdown")
+                    # Display normal Markdown text matching the user's question font style perfectly
+                    st.markdown(message["content"])
+                    # Standard elegant copy snippet matching standard styling
+                    st.copy_to_clipboard(message["content"])
 
 # --- UNIVERSAL CHAT INPUT PIPELINE ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
@@ -364,8 +365,8 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
             else:
-                response_placeholder.empty()
-                st.code(full_response, language="markdown")
+                response_placeholder.markdown(full_response)
+                st.copy_to_clipboard(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
             
