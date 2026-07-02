@@ -77,7 +77,7 @@ def send_real_gmail_otp(to_email, otp_code):
         st.error(f"Gmail Routing Link Error: {e}")
         return False
 
-# Inject 3D Visual Styling & Premium JS Storage Bridge
+# Inject 3D Visual Styling Environment
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -103,9 +103,6 @@ vanta_3d_html = """
         margin-bottom: 6px;
         font-size: 0.9rem;
         color: white;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
 
     .aksharam-image-container { max-width: 550px !important; margin: 15px 0px; border-radius: 14px; border: 2px solid #ff3300; overflow: hidden; box-shadow: 0 8px 24px rgba(255,51,0,0.25); background: #0a0a0a; }
@@ -124,36 +121,6 @@ if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
 if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
 if "messages" not in st.session_state: st.session_state.messages = []
 
-# --- EXTRAORDINARY BRIDGING LAYER: TRUE BROWSER LOCALSTORAGE COUPLING ---
-if "js_sync_done" not in st.session_state:
-    st.session_state.js_sync_done = False
-
-if not st.session_state.js_sync_done:
-    # ફિક્સ કરેલો ડિટેક્ટર કોડ: ક્વેરી પેરામીટર્સનો સુરક્ષિત ઉપયોગ
-    js_detector = st.components.v1.html("""
-    <script>
-        const mode = localStorage.getItem("aksharam_mode");
-        const user = localStorage.getItem("aksharam_user");
-        const id = localStorage.getItem("aksharam_id");
-        if (mode && user && id) {
-            const currentUrl = new URL(window.parent.location.href);
-            if (!currentUrl.searchParams.has("session_id")) {
-                currentUrl.searchParams.set("session_mode", mode);
-                currentUrl.searchParams.set("session_user", user);
-                currentUrl.searchParams.set("session_id", id);
-                window.parent.location.href = currentUrl.toString();
-            }
-        }
-    </script>
-    """, height=0)
-    
-    if "session_id" in st.query_params:
-        st.session_state.app_mode = st.query_params["session_mode"]
-        st.session_state.username = st.query_params["session_user"]
-        st.session_state.identity = st.query_params["session_id"]
-    
-    st.session_state.js_sync_done = True
-
 # SYSTEM PROMPT TEMPLATE
 def get_system_prompt():
     return (
@@ -167,15 +134,7 @@ def get_system_prompt():
         f"5. IMAGE GENERATION PROTOCOL: If asked to create/draw/generate an image, output ONLY: '||IMAGE_PROMPT|| <detailed English description>' and nothing else."
     )
 
-# ઓટોમેટીક ડેટાબેઝ હિસ્ટ્રી લોડર
-if st.session_state.app_mode == "Connected" and not st.session_state.messages:
-    st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-    db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
-    if db_res and db_res.status_code == 200:
-        for entry in db_res.json(): 
-            st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
-
-# SIDEBAR ARCHITECTURE (ChatGPT Style Layout)
+# SIDEBAR ARCHITECTURE (Fixed Input Form Tracking)
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
     
@@ -183,32 +142,30 @@ with st.sidebar:
         st.info("✨ Terminal Locked. Initialize session context.")
         auth_action = st.radio("Choose Matrix Entry:", ["Select Mode", "🚀 Continue As Guest", "🔐 Login / Sign In"])
         
+        # FIX: ગમે ત્યાં Enter મારવાથી સબમિટ થાય તે માટે st.form નો ઉપયોગ કર્યો
         if auth_action == "🚀 Continue As Guest":
-            guest_name = st.text_input("Preferred Name", placeholder="Anonymous")
-            if st.button("Unlock Core", use_container_width=True):
-                if guest_name:
+            with st.form("guest_form", clear_on_submit=False):
+                guest_name = st.text_input("Preferred Name", placeholder="Anonymous")
+                submit_guest = st.form_submit_button("Unlock Core", use_container_width=True)
+                
+                if submit_guest and guest_name:
                     g_user = guest_name.strip()
                     g_id = f"guest_{g_user.lower()}_{random.randint(100,999)}"
-                    
-                    st.components.v1.html(f"""<script>
-                        localStorage.setItem("aksharam_mode", "Connected");
-                        localStorage.setItem("aksharam_user", "{g_user}");
-                        localStorage.setItem("aksharam_id", "{g_id}");
-                        window.parent.location.reload();
-                    </script>""", height=0)
                     st.session_state.app_mode = "Connected"
                     st.session_state.username = g_user
                     st.session_state.identity = g_id
+                    st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
                     st.rerun()
                     
         elif auth_action == "🔐 Login / Sign In":
-            channel = st.radio("Verification Mode:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
-            u_name = st.text_input("Choose Username", placeholder="Your Name")
-            u_target = st.text_input("Target Email / WhatsApp Number", placeholder="user@example.com")
-            u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
-            
-            if st.button("Generate Token", use_container_width=True):
-                if u_name and u_target and u_pass:
+            with st.form("auth_form", clear_on_submit=False):
+                channel = st.radio("Verification Mode:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
+                u_name = st.text_input("Choose Username", placeholder="Your Name")
+                u_target = st.text_input("Target Email / WhatsApp Number", placeholder="user@example.com")
+                u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
+                submit_auth = st.form_submit_button("Generate Token", use_container_width=True)
+                
+                if submit_auth and u_name and u_target and u_pass:
                     otp = str(random.randint(100000, 999999))
                     st.session_state.generated_otp = otp
                     st.session_state.username = u_name
@@ -229,20 +186,27 @@ with st.sidebar:
                         
     elif st.session_state.app_mode == "OTP_Verification":
         st.warning("🔒 Token Verification Window")
-        user_otp = st.text_input("Enter 6-Digit Code", max_chars=6)
-        if st.button("Verify & Launch Core", use_container_width=True):
-            if user_otp == st.session_state.generated_otp or user_otp == MASTER_OTP:
-                st.components.v1.html(f"""<script>
-                    localStorage.setItem("aksharam_mode", "Connected");
-                    localStorage.setItem("aksharam_user", "{st.session_state.username}");
-                    localStorage.setItem("aksharam_id", "{st.session_state.identity}");
-                    window.parent.location.reload();
-                </script>""", height=0)
-                st.session_state.app_mode = "Connected"
-                st.rerun()
-            else:
-                st.error("Mismatch code token.")
-                
+        with st.form("otp_form", clear_on_submit=False):
+            user_otp = st.text_input("Enter 6-Digit Code", max_chars=6)
+            submit_otp = st.form_submit_button("Verify & Launch Core", use_container_width=True)
+            
+            if submit_otp:
+                if user_otp == st.session_state.generated_otp or user_otp == MASTER_OTP:
+                    st.session_state.app_mode = "Connected"
+                    st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+                    
+                    db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
+                    if db_res and db_res.status_code == 200:
+                        for entry in db_res.json(): 
+                            st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
+                    st.rerun()
+                else:
+                    st.error("Mismatch code token.")
+                    
+        if st.button("⬅️ Abort Matrix", use_container_width=True):
+            st.session_state.app_mode = "Unauthorized"
+            st.rerun()
+            
     elif st.session_state.app_mode == "Connected":
         st.success(f"🟢 Logged in as: {st.session_state.username}")
         if st.session_state.identity.startswith(ADMIN_EMAIL):
@@ -265,15 +229,10 @@ with st.sidebar:
             st.rerun()
             
         if st.button("🚪 Disconnect Session (Logout)", use_container_width=True):
-            st.components.v1.html("""<script>
-                localStorage.clear();
-                window.parent.location.href = window.parent.location.origin + window.parent.location.pathname;
-            </script>""", height=0)
             st.session_state.app_mode = "Unauthorized"
             st.session_state.username = ""
             st.session_state.identity = ""
             st.session_state.messages = []
-            st.query_params.clear()
             st.rerun()
 
 # --- MAIN DISPLAY SCREEN ENGINE ---
@@ -291,6 +250,13 @@ def render_image_block(prompt_text):
     st.markdown(html_layout, unsafe_allow_html=True)
 
 # Clean Chat History Display
+if st.session_state.app_mode == "Connected" and not st.session_state.messages:
+    st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+    db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
+    if db_res and db_res.status_code == 200:
+        for entry in db_res.json(): 
+            st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
+
 for msg in st.session_state.messages:
     if msg["role"] == "system": continue
     with st.chat_message(msg["role"]):
