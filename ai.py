@@ -12,7 +12,7 @@ from email.mime.multipart import MIMEMultipart
 # 1. Initialize Page Config
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
-# 2. Grab Infrastructure Keys Safely
+# 2. Grab Infrastructure Keys Safely (Twilio Removed Completely!)
 REQUIRED_KEYS = ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]
 if all(key in st.secrets for key in REQUIRED_KEYS):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
@@ -22,11 +22,6 @@ if all(key in st.secrets for key in REQUIRED_KEYS):
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
     ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"].strip().lower()
     MASTER_OTP = st.secrets.get("MASTER_OTP", "786786")
-    
-    # Twilio Cellular Keys for Fresh Text Messages
-    TWILIO_SID = st.secrets.get("TWILIO_ACCOUNT_SID", None)
-    TWILIO_AUTH = st.secrets.get("TWILIO_AUTH_TOKEN", None)
-    TWILIO_FROM = st.secrets.get("TWILIO_PHONE_NUMBER", None)
 else:
     st.error("Missing architecture keys inside Streamlit Secrets panel.")
     st.stop()
@@ -38,29 +33,38 @@ client = Groq(api_key=GROQ_KEY)
 def generate_secure_hash(secret_string: str) -> str:
     return hashlib.sha256(secret_string.encode('utf-8')).hexdigest()[:24]
 
-# 4. 100% Live Automatic SMS Routing Module (Non-Blocking Cloud Client)
-def send_automatic_cellular_sms(to_phone, password_token, username):
-    if not TWILIO_SID or not TWILIO_AUTH or not TWILIO_FROM:
-        # Fallback Indicator if keys are missing during test phase
-        st.warning("⚠️ Twilio Cellular Gateway keys are missing in Secrets. Simulating dispatch...")
-        return True
+# 4. 100% Free Email-to-SMS Gateway Module (No External APIs Needed!)
+def send_free_cellular_sms(to_phone, password_token, username):
     try:
+        clean_num = ''.join(filter(str.isdigit, to_phone))
+        # Remove country code prefix if user entered 91
+        if len(clean_num) > 10 and clean_num.startswith("91"):
+            clean_num = clean_num[2:]
+            
         sms_body = f"🔱 Aksharam AI Core Secured\nHello {username}, your Unique Guest Key is active.\n🔑 Key: {password_token}\n\nUse it anytime to unlock your timeline. Engineered by TMD."
-        url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json"
-        payload = {
-            "To": f"+{to_phone.strip('+')}",
-            "From": TWILIO_FROM,
-            "Body": sms_body
-        }
-        # Synchronous secure dispatch trigger straight to user handset
-        res = httpx.post(url, data=payload, auth=(TWILIO_SID, TWILIO_AUTH))
-        if res.status_code in [200, 201]:
-            return True
-        else:
-            st.error(f"Cellular Gateway Reject: {res.text}")
-            return False
+        
+        # Indian Cellular Operators Free SMS Gateways Domains List
+        operators_gateways = [
+            f"{clean_num}@jio.com",           # Reliance Jio
+            f"{clean_num}@airtelmail.com",    # Airtel
+            f"{clean_num}@ideacellular.net",  # Vodafone Idea (Vi)
+            f"{clean_num}@sms.bsnl.in"        # BSNL
+        ]
+        
+        # Dispatch SMS via core SMTP layers
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
+            
+            for gateway in operators_gateways:
+                msg = MIMEText(sms_body)
+                msg['From'] = GMAIL_SENDER
+                msg['To'] = gateway
+                msg['Subject'] = "🔱 Aksharam AI Security Key"
+                server.sendmail(GMAIL_SENDER, gateway, msg.as_string())
+        return True
     except Exception as e:
-        st.error(f"Cellular Network Error: {e}")
+        st.error(f"Free SMS Gateway Broadcast Error: {e}")
         return False
 
 # 5. Secure Async Supabase Engine
@@ -79,38 +83,6 @@ async def supabase_request_async(table, method="GET", json_data=None, params=Non
 
 def run_async(coroutine):
     return asyncio.run(coroutine)
-
-# 6. Secure Gmail Routing Function
-def send_real_gmail_otp(to_email, otp_code):
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = f"Aksharam AI <{GMAIL_SENDER}>"
-        msg['To'] = to_email
-        msg['Subject'] = "🔱 Aksharam AI - Secure 6-Digit OTP Code"
-        
-        body = f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; background-color: #000; color: #fff; padding: 20px; border: 2px solid #ff3300; border-radius: 10px;">
-                <h2 style="color: #ff3300; text-align: center;">🔱 Aksharam AI Verification Gateway</h2>
-                <hr style="border: 1px solid #ff3300;">
-                <p>Hello,</p>
-                <p>Your one-time secure verification passcode is:</p>
-                <div style="text-align: center; margin: 20px auto; padding: 15px; background: #111; border: 1px dashed #ff3300; font-size: 2rem; font-weight: bold; letter-spacing: 5px; color: #ff3300;">
-                    {otp_code}
-                </div>
-                <p>This code expires shortly.</p>
-            </body>
-        </html>
-        """
-        msg.attach(MIMEText(body, 'html'))
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_SENDER, to_email, msg.as_string())
-        return True
-    except Exception as e:
-        st.error(f"Gmail Routing Link Error: {e}")
-        return False
 
 # Inject 3D Visual Styling Environment
 vanta_3d_html = """
@@ -178,9 +150,6 @@ with st.sidebar:
         else:
             st.success(f"🟢 Logged in as: {st.session_state.username}")
             
-        if st.session_state.identity == generate_secure_hash(ADMIN_EMAIL):
-            st.success("🔱 ADMIN CLEARANCE DETECTED")
-            
         st.markdown("---")
         st.markdown("💬 **Chat History Timeline**")
         
@@ -204,10 +173,8 @@ with st.sidebar:
             st.session_state.is_returning_user = False
             st.session_state.messages = []
             st.rerun()
-    else:
-        st.warning("🔒 Terminal Locked.")
 
-# --- CENTRAL SECURE ENTER-KEY ENTRY GATEWAY ---
+# --- CENTRAL SECURE ENTRY GATEWAY ---
 if st.session_state.app_mode == "Unauthorized":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #ff3300;'>🔱 Aksharam AI Gateway</h2>", unsafe_allow_html=True)
@@ -218,55 +185,44 @@ if st.session_state.app_mode == "Unauthorized":
     if auth_action == "🚀 Continue As Guest":
         with st.form("main_guest_form", clear_on_submit=False):
             guest_name = st.text_input("Enter Preferred Username", placeholder="Anonymous")
-            guest_phone = st.text_input("Enter Mobile Number (With Country Code, e.g., 919876543210)", placeholder="919876543210")
+            guest_phone = st.text_input("Enter Mobile Number (e.g. 9876543210)", placeholder="9876543210")
             guest_pass = st.text_input("Create/Enter Guest Key (Password)", type="password", placeholder="••••••••")
             submit_guest = st.form_submit_button("Unlock Core Engine 🚀", use_container_width=True)
             
             if submit_guest and guest_name and guest_phone and guest_pass:
                 clean_user = guest_name.strip()
-                clean_phone = ''.join(filter(str.isdigit, guest_phone))
                 secure_guest_id = f"guest_{generate_secure_hash(clean_user.lower())}"
                 
-                # 100% Automatic Cloud Cellular SMS Dispatch Engine Trigger
-                with st.spinner("Broadcasting Secure Key straight to your cellular device..."):
-                    send_automatic_cellular_sms(clean_phone, guest_pass, clean_user)
+                # 100% Free Automatic SMS Dispatch Protocol Execution
+                with st.spinner("Discharging secure key straight to your cellular network..."):
+                    send_free_cellular_sms(guest_phone, guest_pass, clean_user)
                 
                 db_check = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{secure_guest_id}", "limit": 1}))
                 
-                # Direct Pass straight to Main Portal (No Intermediary Dashboard Screens!)
                 st.session_state.app_mode = "Connected"
                 st.session_state.username = clean_user
                 st.session_state.identity = secure_guest_id
                 st.session_state.is_returning_user = True if (db_check and db_check.status_code == 200 and len(db_check.json()) > 0) else False
                 st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-                st.success("🔒 System Unlocked. Fresh SMS Dispatched!")
                 st.rerun()
                 
     elif auth_action == "🔐 Login / Sign In":
+        # Keep native Email routing active as usual
         with st.form("main_auth_form", clear_on_submit=False):
-            channel = st.radio("Verification Route:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
             u_name = st.text_input("Choose Display Name", placeholder="Your Name")
-            u_target = st.text_input("Target Email / WhatsApp Phone", placeholder="user@example.com")
-            u_pass = st.text_input("Create Password", type="password", placeholder="••••••••")
+            u_target = st.text_input("Target Email Address", placeholder="user@example.com")
             submit_auth = st.form_submit_button("Generate Secure Token 🔑", use_container_width=True)
             
-            if submit_auth and u_name and u_target and u_pass:
+            if submit_auth and u_name and u_target:
                 otp = str(random.randint(100000, 999999))
                 st.session_state.generated_otp = otp
                 st.session_state.username = u_name
                 st.session_state.identity = generate_secure_hash(u_target.strip().lower())
                 
-                if channel == "Email Address":
+                with st.spinner("Dispatching token via secure email gateway..."):
                     if send_real_gmail_otp(u_target.strip().lower(), otp):
                         st.session_state.app_mode = "OTP_Verification"
                         st.rerun()
-                else:
-                    clean_phone = ''.join(filter(str.isdigit, u_target))
-                    message_text = f"🔱 Aksharam AI Security Gateway \nYour verification OTP is: {otp}\n\nEngineered by TMD."
-                    encoded_message = urllib.parse.quote(message_text)
-                    st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
-                    st.session_state.app_mode = "OTP_Verification"
-                    st.rerun()
                     
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -274,9 +230,6 @@ if st.session_state.app_mode == "Unauthorized":
 elif st.session_state.app_mode == "OTP_Verification":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #ff3300;'>🔒 Token Verification</h2>", unsafe_allow_html=True)
-    
-    if st.session_state.whatsapp_url:
-        st.markdown(f'<a href="{st.session_state.whatsapp_url}" target="_blank"><div style="background-color:#25D366; color:white; text-align:center; padding:10px; border-radius:5px; font-weight:bold; margin-bottom:15px;">🟢 Open WhatsApp to Send Code</div></a>', unsafe_allow_html=True)
         
     with st.form("main_otp_form", clear_on_submit=False):
         user_otp = st.text_input("Enter 6-Digit Verification Code", max_chars=6, placeholder="000000")
