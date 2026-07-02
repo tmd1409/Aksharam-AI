@@ -65,7 +65,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
         if method == "POST": return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# Inject 3D Visual Styling & STRIP OUT ALL STREAMLIT TOOLBARS/BUTTONS FOR CLEAN LOOK
+# Inject 3D Visual Styling & CLEAN UI OVERRIDES
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -216,17 +216,15 @@ elif st.session_state.app_mode == "OTP_Screen":
     st.stop()
 
 # --- MAIN ACTIVE SYSTEM CORE ---
-# Dynamically programmed for immediate linguistic adaptation and 2026 timeline calibration
 SYSTEM_PROMPT = (
     f"Your name is Aksharam, an elite super-assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
     f"Assisting user: {st.session_state.username}. "
     f"CRITICAL SYSTEM SETTINGS:\n"
     f"1. The current year is 2026. Evaluate all timelines, facts, and events up to the year 2026.\n"
-    f"2. DYNAMIC LANGUAGE ADAPTATION: You must analyze the language of the user's input. "
-    f"If the user writes in Gujarati (ગુજરાતી), reply entirely in flawless, sophisticated Gujarati. "
-    f"If they write in Hindi, reply in Hindi. If they write in English, reply in English.\n"
-    f"3. COMMAND OVERRIDE: If the user explicitly asks you to change languages (e.g., 'મને ગુજરાતીમાં જવાબ આપો' or 'reply in Hindi' or 'write this in English'), "
-    f"you must ignore the baseline typing language and strictly execute the response in the requested language target requested by the prompt."
+    f"2. Language Match Mode: Reply fluidly in the language used or explicitly requested by the user.\n"
+    f"3. IMAGE GENERATION PROTOCOL: If the user explicitly asks to create, draw, generate, or visualize an image (even in Gujarati like 'ચિત્ર બનાવો'), "
+    f"you must respond with EXACTLY this special pattern: '||IMAGE_PROMPT|| <detailed English description of the art>' and absolutely nothing else. "
+    f"You must translate their request into a highly detailed, cinematic, high-resolution descriptive art prompt in English so the generator understands it perfectly."
 )
 
 if "messages" not in st.session_state:
@@ -245,6 +243,8 @@ with st.sidebar:
     else:
         st.warning("🟡 GUEST CLEARANCE ONLY")
     st.markdown("---")
+    st.markdown("💡 **Tip:** Try saying: *'Create an image of a golden trident over a futuristic city'* or *'સિંહનું સુંદર ચિત્ર બનાવો'*")
+    st.markdown("---")
     if st.button("🔒 Secure Session Exit", use_container_width=True):
         st.session_state.app_mode = "Gateway"
         st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -253,11 +253,20 @@ with st.sidebar:
 st.title("🔱 Aksharam Core Engine")
 st.markdown(f"### Hi {st.session_state.username}, how can Aksharam help you today?")
 
+# Render previous logs safely (and clean up structural image tags if needed)
 for message in st.session_state.messages:
     if message["role"] != "system":
-        with st.chat_message(message["role"]): st.markdown(message["content"])
+        with st.chat_message(message["role"]):
+            if "||IMAGE_PROMPT||" in message["content"]:
+                clean_prompt = message["content"].replace("||IMAGE_PROMPT||", "").strip()
+                encoded_prompt = urllib.parse.quote(clean_prompt)
+                img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
+                st.info(f"🖼️ Generated Image for: *{clean_prompt}*")
+                st.image(img_url, use_container_width=True)
+            else:
+                st.markdown(message["content"])
 
-# --- UNIVERSAL CHAT INPUT ---
+# --- UNIVERSAL CHAT INPUT PIPELINE ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
     with st.chat_message("user"): st.markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -277,7 +286,22 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
                 if chunk.choices[0].delta.content:
                     full_response += chunk.choices[0].delta.content
                     response_placeholder.markdown(full_response + "▌")
-            response_placeholder.markdown(full_response)
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
+            
+            # Check if the generated response triggered our image protocol
+            if "||IMAGE_PROMPT||" in full_response:
+                clean_prompt = full_response.replace("||IMAGE_PROMPT||", "").strip()
+                encoded_prompt = urllib.parse.quote(clean_prompt)
+                img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
+                
+                response_placeholder.empty()
+                st.info(f"🎨 Generating visual matrix for: *{clean_prompt}*")
+                st.image(img_url, use_container_width=True)
+                
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
+            else:
+                response_placeholder.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
+                
         except Exception as e: st.error(f"Cloud Routing Error: {e}")
