@@ -328,19 +328,19 @@ def render_image_block(prompt_text):
     '''
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Render previous logs with discrete, sleek copy text layers
+# Render logs safely: only adds single-click code copy button blocks under assistant answers
 for idx, message in enumerate(st.session_state.messages):
     if message["role"] != "system":
         with st.chat_message(message["role"]):
             if "||IMAGE_PROMPT||" in message["content"]:
                 clean_prompt = message["content"].replace("||IMAGE_PROMPT||", "").strip()
                 render_image_block(clean_prompt)
-                st.caption("📋 **Prompt:**")
-                st.code(clean_prompt, language="text")
+                if message["role"] == "assistant":
+                    st.code(clean_prompt, language="text")
             else:
                 st.markdown(message["content"])
-                st.caption("📋 **Click below to copy context:**")
-                st.code(message["content"], language="text")
+                if message["role"] == "assistant":
+                    st.code(message["content"], language="text")
 
 # --- UNIVERSAL CHAT INPUT PIPELINE ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
