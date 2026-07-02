@@ -92,7 +92,7 @@ vanta_3d_html = """
 
     /* Custom high clarity crisp view layout rules for images */
     .aksharam-image-container {
-        max-width: 550px !important;
+        max-width: 100% !important;
         margin: 15px 0px;
         border-radius: 14px;
         border: 2px solid #ff3300;
@@ -104,8 +104,6 @@ vanta_3d_html = """
         width: 100% !important;
         height: auto !important;
         object-fit: contain !important;
-        image-rendering: -webkit-optimize-contrast !important;
-        image-rendering: crisp-edges !important;
     }
     .download-action-btn {
         display: inline-block;
@@ -117,13 +115,7 @@ vanta_3d_html = """
         border-radius: 8px;
         margin: 12px;
         font-size: 0.95rem;
-        transition: all 0.3s ease;
         text-align: center;
-        box-shadow: 0 4px 12px rgba(255,51,0,0.3);
-    }
-    .download-action-btn:hover {
-        background-color: #ff5522;
-        transform: translateY(-2px);
     }
 </style>
 """
@@ -260,7 +252,7 @@ SYSTEM_PROMPT = (
     f"1. Current Year: 2026.\n"
     f"2. Language Match Mode: Reply fluidly in the language used or explicitly requested by the user.\n"
     f"3. IMAGE GENERATION PROTOCOL: ONLY generate an image if the user explicitly orders you to 'create an image', 'draw', 'generate an image', or 'visualize'. "
-    f"If they are just asking normal conversational questions, chat logs, or software advice, do NOT trigger the image code. "
+    f"If they are just asking normal conversational questions, do NOT trigger the image code. "
     f"If they explicitly request a visual, you must respond with EXACTLY this special pattern: '||IMAGE_PROMPT|| <detailed English description of the art>' and absolutely nothing else."
 )
 
@@ -307,15 +299,13 @@ with st.sidebar:
         st.rerun()
 
 st.title("🔱 Aksharam Core Engine")
-st.markdown(f"### Hi {st.session_state.username}, how can Aksharam help you today?")
 
-# Render interface helper tool
-def render_image_block(prompt_text):
+# Render interface helper tool for images
+def render_image_block(container, prompt_text):
     encoded_prompt = urllib.parse.quote(prompt_text)
     img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
     
-    st.info(f"🎨 Visual matrix deployed for prompt: *{prompt_text}*")
-    
+    container.info(f"🎨 Visual matrix deployed for prompt: *{prompt_text}*")
     html_layout = f'''
     <div class="aksharam-image-container">
         <img src="{img_url}" alt="Aksharam AI Generated Output">
@@ -326,57 +316,51 @@ def render_image_block(prompt_text):
         </div>
     </div>
     '''
-    st.markdown(html_layout, unsafe_allow_html=True)
+    container.markdown(html_layout, unsafe_allow_html=True)
 
-# Render logs safely: only adds single-click code copy button blocks under assistant answers
-for idx, message in enumerate(st.session_state.messages):
-    if message["role"] != "system":
-        with st.chat_message(message["role"]):
-            if "||IMAGE_PROMPT||" in message["content"]:
-                clean_prompt = message["content"].replace("||IMAGE_PROMPT||", "").strip()
-                render_image_block(clean_prompt)
-                if message["role"] == "assistant":
-                    st.code(clean_prompt, language="text")
-            else:
+# Create split asymmetric layout grid (Left: Questions, Right: Answers)
+left_column, right_column = st.columns([2, 3], gap="medium")
+
+with left_column:
+    st.markdown("### ❓ Your Questions")
+    # Loop user queries only
+    for idx, message in enumerate(st.session_state.messages):
+        if message["role"] == "user":
+            with st.chat_message("user"):
                 st.markdown(message["content"])
-                if message["role"] == "assistant":
-                    st.code(message["content"], language="text")
+
+with right_column:
+    st.markdown("### 🔱 Aksharam Answers")
+    # Loop assistant answers only
+    for idx, message in enumerate(st.session_state.messages):
+        if message["role"] == "assistant":
+            with st.chat_message("assistant"):
+                if "||IMAGE_PROMPT||" in message["content"]:
+                    clean_prompt = message["content"].replace("||IMAGE_PROMPT||", "").strip()
+                    render_image_block(st, clean_prompt)
+                else:
+                    # Renders text inside a single field equipped with a native hover copy icon
+                    st.code(message["content"], language="markdown")
 
 # --- UNIVERSAL CHAT INPUT PIPELINE ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
-    with st.chat_message("user"): 
-        st.markdown(user_input)
+    # Append user question to history
     st.session_state.messages.append({"role": "user", "content": user_input})
     supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
 
-    with st.chat_message("assistant"):
-        response_placeholder = st.empty()
-        full_response = ""
-        try:
-            completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile", 
-                messages=st.session_state.messages, 
-                temperature=0.3, 
-                stream=True
-            )
-            for chunk in completion:
-                if chunk.choices[0].delta.content:
-                    full_response += chunk.choices[0].delta.content
-                    response_placeholder.markdown(full_response + "▌")
-            
-            if "||IMAGE_PROMPT||" in full_response:
-                clean_prompt = full_response.replace("||IMAGE_PROMPT||", "").strip()
-                response_placeholder.empty()
-                render_image_block(clean_prompt)
+    # Request fresh AI logic layer
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile", 
+            messages=st.session_state.messages, 
+            temperature=0.3, 
+            stream=False
+        )
+        full_response = completion.choices[0].message.content
+        
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
+        supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
+        st.rerun()
                 
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
-            else:
-                response_placeholder.markdown(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
-            
-            if len(user_queries) == 0:
-                st.rerun()
-                
-        except Exception as e: st.error(f"Cloud Routing Error: {e}")
+    except Exception as e: 
+        st.error(f"Cloud Routing Error: {e}")
