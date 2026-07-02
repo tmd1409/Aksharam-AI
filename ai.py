@@ -65,7 +65,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
         if method == "POST": return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# Inject 3D Visual Styling & Font Matching Rules
+# Inject 3D Visual Styling & Custom Copy Utility Action Rules
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -73,6 +73,21 @@ vanta_3d_html = """
 <script>
     VANTA.NET({el: "#vanta-bg", mouseControls: true, touchControls: true, minHeight: 200.00, minWidth: 200.00, scale: 1.00, color: 0xff3300, backgroundColor: 0x000000})
 </script>
+
+<script>
+function copyTextToClipboard(textId, buttonEl) {
+    var textContent = document.getElementById(textId).innerText;
+    navigator.clipboard.writeText(textContent).then(function() {
+        buttonEl.innerHTML = "📋 Copied!";
+        buttonEl.style.color = "#25D366";
+        setTimeout(function() {
+            buttonEl.innerHTML = "🔗 Copy Answer";
+            buttonEl.style.color = "#ff3300";
+        }, 1800);
+    });
+}
+</script>
+
 <style>
     #MainMenu {visibility: hidden; display: none !important;}
     header {visibility: hidden; display: none !important;}
@@ -89,21 +104,6 @@ vanta_3d_html = """
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 30px; border-radius: 15px; max-width: 500px; margin: 40px auto; box-shadow: 0 0 30px rgba(255, 51, 0, 0.3); }
     .quote-box { font-style: italic; color: #ff3300; text-align: center; margin-bottom: 20px; font-size: 1.1rem; font-weight: bold; }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
-
-    /* Forces the code snippet block to match standard chat font exactly */
-    [data-testid="stCodeBlock"] code {
-        font-family: inherit !important;
-        font-size: 1rem !important;
-        background: transparent !important;
-        color: #ffffff !important;
-        white-space: pre-wrap !important;
-    }
-    [data-testid="stCodeBlock"] {
-        background-color: transparent !important;
-        border: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
 
     /* Custom layout rules for crisp image container output rendering */
     .aksharam-image-container {
@@ -345,8 +345,17 @@ for idx, message in enumerate(st.session_state.messages):
                 if message["role"] == "user":
                     st.markdown(message["content"])
                 elif message["role"] == "assistant":
-                    # Uses st.code to get the built-in copy icon, but CSS overrides the font to match st.markdown exactly
-                    st.code(message["content"])
+                    # Uses standard markdown to maintain the font style perfectly
+                    st.markdown(f'<div id="msg_{idx}">{message["content"]}</div>', unsafe_allow_html=True)
+                    
+                    # Renders an elegant custom text link that accurately copies the content on a single click
+                    copy_layout = f'''
+                    <div style="text-align: right; margin-top: -5px; margin-bottom: 10px;">
+                        <span style="color: #ff3300; cursor: pointer; font-size: 0.85rem; font-weight: bold; text-decoration: underline;" 
+                              onclick="parent.copyTextToClipboard('msg_{idx}', this)">🔗 Copy Answer</span>
+                    </div>
+                    '''
+                    st.components.v1.html(copy_layout, height=25)
 
 # --- UNIVERSAL CHAT INPUT PIPELINE ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
@@ -379,7 +388,19 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
             else:
                 response_placeholder.empty()
-                st.code(full_response)
+                
+                # Render clean layout for incoming data pipelines
+                new_idx = len(st.session_state.messages)
+                st.markdown(f'<div id="msg_{new_idx}">{full_response}</div>', unsafe_allow_html=True)
+                
+                copy_layout = f'''
+                <div style="text-align: right; margin-top: -5px; margin-bottom: 10px;">
+                    <span style="color: #ff3300; cursor: pointer; font-size: 0.85rem; font-weight: bold; text-decoration: underline;" 
+                          onclick="parent.copyTextToClipboard('msg_{new_idx}', this)">🔗 Copy Answer</span>
+                </div>
+                '''
+                st.components.v1.html(copy_layout, height=25)
+                
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
             
