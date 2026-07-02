@@ -11,14 +11,15 @@ from email.mime.multipart import MIMEMultipart
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
 # 2. Grab Infrastructure Keys Safely
-if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD"]):
+if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SB_URL = st.secrets["SUPABASE_URL"]
     SB_KEY = st.secrets["SUPABASE_KEY"]
     GMAIL_SENDER = st.secrets["GMAIL_SENDER"]
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
+    ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"]
 else:
-    st.error("Missing architecture keys inside Streamlit Secrets panel.")
+    st.error("Missing architecture keys or ADMIN_EMAIL inside Streamlit Secrets panel.")
     st.stop()
 
 client = Groq(api_key=GROQ_KEY)
@@ -64,7 +65,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
         if method == "POST": return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# Inject 3D Visual Styling Core
+# Inject 3D Visual Styling Core & HIDE STREAMLIT MENUS
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -73,6 +74,13 @@ vanta_3d_html = """
     VANTA.NET({el: "#vanta-bg", mouseControls: true, touchControls: true, minHeight: 200.00, minWidth: 200.00, scale: 1.00, color: 0xff3300, backgroundColor: 0x000000})
 </script>
 <style>
+    /* HIDE DEFAULT STREAMLIT UI ELEMENTS */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden !important;}
+
+    /* CUSTOM AKSHARAM STYLING */
     .stApp { background: transparent !important; }
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; border-right: 2px solid rgba(255, 51, 0, 0.3); }
     [data-testid="stChatMessage"] { background-color: rgba(10, 10, 10, 0.85) !important; border-radius: 16px; border: 2.5px solid #ff3300 !important; }
@@ -153,46 +161,32 @@ elif st.session_state.app_mode == "Auth_Setup":
                         st.session_state.app_mode = "OTP_Screen"
                         st.rerun()
             else:
-                # Clean the phone number format
                 clean_phone = ''.join(filter(str.isdigit, u_target))
                 message_text = f"🔱 Aksharam AI Security Gateway \nYour unique secure verification OTP is: {otp}\n\nEngineered by TMD."
                 encoded_message = urllib.parse.quote(message_text)
                 
-                # Generate WhatsApp deep link structure
                 st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
-                st.session_state.app_mode = "WhatsApp_Link_Screen"
+                st.session_state.app_mode = "OTP_Screen"
                 st.rerun()
             
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
-elif st.session_state.app_mode == "WhatsApp_Link_Screen":
-    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-    st.title("📲 Send Your WhatsApp OTP")
-    st.write("Because carrier mobile towers block free automatic messages, click the button below to generate your real code securely via WhatsApp:")
-    
-    # Render direct link button for deep routing
-    st.markdown(f'''
-        <a href="{st.session_state.whatsapp_url}" target="_blank" style="text-decoration:none;">
-            <div style="background-color:#25D366; color:white; text-align:center; padding:12px; border-radius:10px; font-weight:bold; font-size:1.2rem; margin-bottom:20px; box-shadow: 0 4px 15px rgba(37,211,102,0.4);">
-                🟢 Open WhatsApp & Receive OTP
-            </div>
-        </a>
-    ''', unsafe_allow_html=True)
-    
-    st.write("After you check the message on your phone, click 'Next' to input it.")
-    if st.button("Proceed to Entry Screen ➡️", use_container_width=True):
-        st.session_state.app_mode = "OTP_Screen"
-        st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 elif st.session_state.app_mode == "OTP_Screen":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.title("🔒 Verify Security Token")
-    st.write(f"Enter the code dispatched to: `{st.session_state.identity}`")
+    st.write(f"Verification tracking reference: `{st.session_state.identity}`")
     
-    st.write("Enter Verification Code:")
+    if st.session_state.whatsapp_url:
+        st.markdown(f'''
+            <a href="{st.session_state.whatsapp_url}" target="_blank" style="text-decoration:none;">
+                <div style="background-color:#25D366; color:white; text-align:center; padding:12px; border-radius:10px; font-weight:bold; font-size:1.1rem; margin-bottom:25px; box-shadow: 0 4px 15px rgba(37,211,102,0.4);">
+                    🟢 Click to Open WhatsApp & Send Code
+                </div>
+            </a>
+        ''', unsafe_allow_html=True)
+
+    st.write("Enter 6-Digit Code:")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1: b1 = st.text_input("", max_chars=1, key="b1", label_visibility="collapsed")
     with c2: b2 = st.text_input("", max_chars=1, key="b2", label_visibility="collapsed")
@@ -212,6 +206,7 @@ elif st.session_state.app_mode == "OTP_Screen":
             st.error("Security authorization passcode mismatch.")
             
     if st.button("⬅️ Back / Edit Details", use_container_width=True):
+        st.session_state.whatsapp_url = "" 
         st.session_state.app_mode = "Auth_Setup"
         st.rerun()
             
@@ -229,6 +224,10 @@ if "messages" not in st.session_state:
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
     st.markdown(f"**Operator:** `{st.session_state.username}`")
+    if st.session_state.identity == ADMIN_EMAIL:
+        st.success("🟢 ADMIN CLEARANCE GRANTED")
+    else:
+        st.warning("🟡 GUEST CLEARANCE ONLY")
     st.markdown("---")
     if st.button("🔒 Secure Session Exit", use_container_width=True):
         st.session_state.app_mode = "Gateway"
@@ -242,21 +241,26 @@ for message in st.session_state.messages:
     if message["role"] != "system":
         with st.chat_message(message["role"]): st.markdown(message["content"])
 
-if user_input := st.chat_input("Query Aksharam Framework..."):
-    with st.chat_message("user"): st.markdown(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
+# --- ADMIN WRITE LOCK LOGIC ---
+if st.session_state.identity == ADMIN_EMAIL:
+    if user_input := st.chat_input("Query Aksharam Framework..."):
+        with st.chat_message("user"): st.markdown(user_input)
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
 
-    with st.chat_message("assistant"):
-        response_placeholder = st.empty()
-        full_response = ""
-        try:
-            completion = client.chat.completions.create(model="llama-3.1-8b-instant", messages=st.session_state.messages, temperature=0.1, stream=True)
-            for chunk in completion:
-                if chunk.choices[0].delta.content:
-                    full_response += chunk.choices[0].delta.content
-                    response_placeholder.markdown(full_response + "▌")
-            response_placeholder.markdown(full_response)
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
-        except Exception as e: st.error(f"Cloud Routing Error: {e}")
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            full_response = ""
+            try:
+                completion = client.chat.completions.create(model="llama-3.1-8b-instant", messages=st.session_state.messages, temperature=0.1, stream=True)
+                for chunk in completion:
+                    if chunk.choices[0].delta.content:
+                        full_response += chunk.choices[0].delta.content
+                        response_placeholder.markdown(full_response + "▌")
+                response_placeholder.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
+            except Exception as e: st.error(f"Cloud Routing Error: {e}")
+else:
+    # If it is anyone else, they don't get the chat input box!
+    st.info("🔒 System is locked in Read-Only Mode. Only the Admin can send queries to Aksharam.")
