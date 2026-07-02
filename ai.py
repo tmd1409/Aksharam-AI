@@ -74,7 +74,6 @@ vanta_3d_html = """
     VANTA.NET({el: "#vanta-bg", mouseControls: true, touchControls: true, minHeight: 200.00, minWidth: 200.00, scale: 1.00, color: 0xff3300, backgroundColor: 0x000000})
 </script>
 <style>
-    /* HIDE THE STREAMLIT DEPLOY BUTTON, TOOLBAR, STAR ICON, AND HAMBURGER MENU COMPLETELY */
     #MainMenu {visibility: hidden; display: none !important;}
     header {visibility: hidden; display: none !important;}
     footer {visibility: hidden; display: none !important;}
@@ -84,7 +83,6 @@ vanta_3d_html = """
     [data-testid="stStatusWidget"] {display: none !important;}
     .stDeployButton {display: none !important;}
 
-    /* CUSTOM FRAMEWORK STYLING */
     .stApp { background: transparent !important; }
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; border-right: 2px solid rgba(255, 51, 0, 0.3); }
     [data-testid="stChatMessage"] { background-color: rgba(10, 10, 10, 0.85) !important; border-radius: 16px; border: 2.5px solid #ff3300 !important; }
@@ -218,7 +216,17 @@ elif st.session_state.app_mode == "OTP_Screen":
     st.stop()
 
 # --- MAIN ACTIVE CHAT INTERFACE ---
-SYSTEM_PROMPT = f"Your name is Aksharam, an elite assistant engineered by Trushal Yogeshbhai Maniya (TMD). Assisting user: {st.session_state.username}."
+# Upgraded prompt with strict 2026 temporal awareness and flawless native-level Gujarati rules
+SYSTEM_PROMPT = (
+    f"Your name is Aksharam, an elite super-assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
+    f"Assisting user: {st.session_state.username}. "
+    f"CRITICAL SYSTEM SETTINGS:\n"
+    f"1. The current year is 2026. You must evaluate all timelines, technologies, facts, and events up to the year 2026.\n"
+    f"2. You possess perfect, absolute, native-level fluency in Gujarati, Hindi, English, and other regional languages. "
+    f"When the user interacts with you in Gujarati (ગુજરાતી), you must respond in highly sophisticated, grammatically flawless, natural Gujarati. "
+    f"Do not use clunky computer translations or mix incorrect Hindi tokens into Gujarati responses. Keep it clear, eloquent, and culturally accurate."
+)
+
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     db_res = supabase_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"})
@@ -247,8 +255,7 @@ for message in st.session_state.messages:
     if message["role"] != "system":
         with st.chat_message(message["role"]): st.markdown(message["content"])
 
-# --- UNIVERSAL OPEN CHAT INPUT ---
-# Removed the admin check wrapper so any authenticated or guest status user can query the engine
+# --- UNIVERSAL CHAT INPUT ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
     with st.chat_message("user"): st.markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -258,7 +265,13 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
         response_placeholder = st.empty()
         full_response = ""
         try:
-            completion = client.chat.completions.create(model="llama-3.1-8b-instant", messages=st.session_state.messages, temperature=0.1, stream=True)
+            # UPGRADED TO THE 70-BILLION MULTILINGUAL MASTER ENGINE (llama-3.3-70b-versatile)
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile", 
+                messages=st.session_state.messages, 
+                temperature=0.3, 
+                stream=True
+            )
             for chunk in completion:
                 if chunk.choices[0].delta.content:
                     full_response += chunk.choices[0].delta.content
