@@ -95,7 +95,6 @@ vanta_3d_html = """
     h1, h2, h3, p, span, label { color: #ffffff !important; }
     .poetic-title { font-family: 'Georgia', serif; font-style: italic; color: #ffffff !important; text-shadow: 0 0 10px rgba(255, 51, 0, 0.5); }
     
-    /* Sidebar Chat History List Items like ChatGPT */
     .chat-history-item {
         background: rgba(255, 51, 0, 0.1);
         border: 1px solid rgba(255, 51, 0, 0.3);
@@ -126,42 +125,34 @@ if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
 if "messages" not in st.session_state: st.session_state.messages = []
 
 # --- EXTRAORDINARY BRIDGING LAYER: TRUE BROWSER LOCALSTORAGE COUPLING ---
-# ChatGPT/Gemini જેવી સિસ્ટમ: કોઈ URL ની જરૂર નથી, ડાયરેક્ટ બ્રાઉઝર ડેટા સિંક
 if "js_sync_done" not in st.session_state:
     st.session_state.js_sync_done = False
 
 if not st.session_state.js_sync_done:
-    # ટર્મિનલ લોડ થતાં જ અદ્રશ્ય JavaScript રન થશે જે બ્રાઉઝરની સ્ટોરેજ ચેક કરશે
+    # ફિક્સ કરેલો ડિટેક્ટર કોડ: ક્વેરી પેરામીટર્સનો સુરક્ષિત ઉપયોગ
     js_detector = st.components.v1.html("""
     <script>
         const mode = localStorage.getItem("aksharam_mode");
         const user = localStorage.getItem("aksharam_user");
         const id = localStorage.getItem("aksharam_id");
         if (mode && user && id) {
-            window.parent.document.title = "Aksharam AI | Verified Session";
-            // Send back parameters straight into active python runtime queries
-            const enc = window.btoa(JSON.stringify({mode, user, id}));
-            window.parent.location.hash = "session=" + enc;
-        } else {
-            window.parent.location.hash = "session=none";
+            const currentUrl = new URL(window.parent.location.href);
+            if (!currentUrl.searchParams.has("session_id")) {
+                currentUrl.searchParams.set("session_mode", mode);
+                currentUrl.searchParams.set("session_user", user);
+                currentUrl.searchParams.set("session_id", id);
+                window.parent.location.href = currentUrl.toString();
+            }
         }
     </script>
     """, height=0)
     
-    # Python હેશ પેરામીટર્સ રીડ કરશે (કોઈ વિઝિબલ URL પ્રિન્ટ વગર)
-    hash_args = st.context.get_url_hash()
-    if "session=" in hash_args:
-        raw_hash = hash_args.split("session=")[-1]
-        if raw_hash != "none":
-            try:
-                import base64, json
-                dec_data = json.loads(base64.b64decode(raw_hash).decode())
-                st.session_state.app_mode = dec_data["mode"]
-                st.session_state.username = dec_data["user"]
-                st.session_state.identity = dec_data["id"]
-            except:
-                pass
-        st.session_state.js_sync_done = True
+    if "session_id" in st.query_params:
+        st.session_state.app_mode = st.query_params["session_mode"]
+        st.session_state.username = st.query_params["session_user"]
+        st.session_state.identity = st.query_params["session_id"]
+    
+    st.session_state.js_sync_done = True
 
 # SYSTEM PROMPT TEMPLATE
 def get_system_prompt():
@@ -176,7 +167,7 @@ def get_system_prompt():
         f"5. IMAGE GENERATION PROTOCOL: If asked to create/draw/generate an image, output ONLY: '||IMAGE_PROMPT|| <detailed English description>' and nothing else."
     )
 
-# ઓટોમેટીક ડેટાબેઝ હિસ્ટ્રી લોડર (ચેટ ઓપન થતાં જ ઈતિહાસ પાછો લાવશે)
+# ઓટોમેટીક ડેટાબેઝ હિસ્ટ્રી લોડર
 if st.session_state.app_mode == "Connected" and not st.session_state.messages:
     st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
     db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
@@ -184,7 +175,7 @@ if st.session_state.app_mode == "Connected" and not st.session_state.messages:
         for entry in db_res.json(): 
             st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
 
-# SIDEBAR ARCHITECTURE (ChatGPT Matrix Layout)
+# SIDEBAR ARCHITECTURE (ChatGPT Style Layout)
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
     
@@ -199,7 +190,6 @@ with st.sidebar:
                     g_user = guest_name.strip()
                     g_id = f"guest_{g_user.lower()}_{random.randint(100,999)}"
                     
-                    # JavaScript વડે લોકલસ્ટોરેજમાં કાયમી સેવ કરી દો
                     st.components.v1.html(f"""<script>
                         localStorage.setItem("aksharam_mode", "Connected");
                         localStorage.setItem("aksharam_user", "{g_user}");
@@ -242,7 +232,6 @@ with st.sidebar:
         user_otp = st.text_input("Enter 6-Digit Code", max_chars=6)
         if st.button("Verify & Launch Core", use_container_width=True):
             if user_otp == st.session_state.generated_otp or user_otp == MASTER_OTP:
-                # JavaScript વડે સાચા યુઝર લોગિનને બ્રાઉઝરમાં લોક કરી દો
                 st.components.v1.html(f"""<script>
                     localStorage.setItem("aksharam_mode", "Connected");
                     localStorage.setItem("aksharam_user", "{st.session_state.username}");
@@ -255,17 +244,16 @@ with st.sidebar:
                 st.error("Mismatch code token.")
                 
     elif st.session_state.app_mode == "Connected":
-        st.success(f"🟢 Already logged in as: {st.session_state.username}")
+        st.success(f"🟢 Logged in as: {st.session_state.username}")
         if st.session_state.identity.startswith(ADMIN_EMAIL):
             st.success("🔱 ADMIN CLEARANCE DETECTED")
             
         st.markdown("---")
-        st.markdown("💬 **ChatGPT Style History Matrix**")
+        st.markdown("💬 **Chat History Timeline**")
         
-        # સાઇડબારમાં જૂના પ્રશ્નોનું બ્યુટીફુલ લિસ્ટ બનાવશે (ChatGPT ની જેમ)
         user_queries = [m["content"] for m in st.session_state.messages if m["role"] == "user"]
         if user_queries:
-            for q in user_queries[-5:]: # છેલ્લા 5 મહત્વના પ્રશ્નો સાઇડબારમાં બતાવશે
+            for q in user_queries[-5:]:
                 short_q = q[:24] + "..." if len(q) > 24 else q
                 st.markdown(f"<div class='chat-history-item'>✨ {short_q}</div>", unsafe_allow_html=True)
         else:
@@ -277,15 +265,15 @@ with st.sidebar:
             st.rerun()
             
         if st.button("🚪 Disconnect Session (Logout)", use_container_width=True):
-            # લોગઆઉટ કરવાથી બ્રાઉઝરની લોકલ મેમરી પણ ક્લિયર થઈ જશે
             st.components.v1.html("""<script>
                 localStorage.clear();
-                window.parent.location.reload();
+                window.parent.location.href = window.parent.location.origin + window.parent.location.pathname;
             </script>""", height=0)
             st.session_state.app_mode = "Unauthorized"
             st.session_state.username = ""
             st.session_state.identity = ""
             st.session_state.messages = []
+            st.query_params.clear()
             st.rerun()
 
 # --- MAIN DISPLAY SCREEN ENGINE ---
@@ -345,7 +333,7 @@ if user_input := st.chat_input(poetic_placeholder, disabled=(st.session_state.ap
 
         st.session_state.messages.append({"role": "assistant", "content": full_response})
         asyncio.run(supabase_request_async("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response}))
-        st.rerun() # Refresh layout to cleanly sync sidebar timeline list items
+        st.rerun()
                 
     except Exception as e: 
         st.error(f"Cloud Routing Error: {e}")
