@@ -328,17 +328,19 @@ def render_image_block(prompt_text):
     '''
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Render previous logs safely with built-in copy containers
+# Render previous logs with discrete, sleek copy text layers
 for idx, message in enumerate(st.session_state.messages):
     if message["role"] != "system":
         with st.chat_message(message["role"]):
             if "||IMAGE_PROMPT||" in message["content"]:
                 clean_prompt = message["content"].replace("||IMAGE_PROMPT||", "").strip()
                 render_image_block(clean_prompt)
-                st.text_area("📋 Image Prompt Data (Click to copy)", value=clean_prompt, height=70, key=f"copy_img_{idx}")
+                st.caption("📋 **Prompt:**")
+                st.code(clean_prompt, language="text")
             else:
                 st.markdown(message["content"])
-                st.text_area("📋 Copy Message Content", value=message["content"], height=85, key=f"copy_text_{idx}")
+                st.caption("📋 **Click below to copy context:**")
+                st.code(message["content"], language="text")
 
 # --- UNIVERSAL CHAT INPUT PIPELINE ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
