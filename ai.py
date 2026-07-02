@@ -22,6 +22,9 @@ if all(key in st.secrets for key in REQUIRED_KEYS):
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
     ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"].strip().lower()
     MASTER_OTP = st.secrets.get("MASTER_OTP", "786786")
+    
+    # Active Indian SMS Gateway Key
+    FAST2SMS_KEY = st.secrets.get("FAST2SMS_API_KEY", None)
 else:
     st.error("Missing architecture keys inside Streamlit Secrets panel.")
     st.stop()
@@ -33,7 +36,44 @@ client = Groq(api_key=GROQ_KEY)
 def generate_secure_hash(secret_string: str) -> str:
     return hashlib.sha256(secret_string.encode('utf-8')).hexdigest()[:24]
 
-# 4. Secure Async Supabase Engine
+# 4. 100% Live Automatic Indian Cellular SMS Router (Fast2SMS)
+def send_pure_cellular_sms(to_phone, password_token, username):
+    if not FAST2SMS_KEY:
+        st.warning("⚠️ Fast2SMS API Key missing inside Secrets. Simulating dispatch...")
+        return True
+    try:
+        # Filter and extract exact 10 digits
+        clean_num = ''.join(filter(str.isdigit, to_phone))
+        if len(clean_num) > 10 and clean_num.startswith("91"):
+            clean_num = clean_num[2:]
+            
+        sms_body = f"🔱 Aksharam AI Gateway Secured\nHello {username}, your Unique Guest Key is active.\n🔑 Password: {password_token}\n\nKeep it safe to reopen your timeline. Engineered by TMD."
+        
+        url = "https://www.fast2sms.com/dev/bulkV2"
+        headers = {
+            "authorization": FAST2SMS_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "route": "q",
+            "message": sms_body,
+            "language": "english",
+            "flash": 0,
+            "numbers": clean_num
+        }
+        
+        # Instant automatic cellular dispatch straight to user phone
+        res = httpx.post(url, json=payload, headers=headers)
+        if res.status_code == 200 and res.json().get("return"):
+            return True
+        else:
+            st.error(f"Cellular Gateway Reject: {res.text}")
+            return False
+    except Exception as e:
+        st.error(f"Cellular Network Error: {e}")
+        return False
+
+# 5. Secure Async Supabase Engine
 async def supabase_request_async(table, method="GET", json_data=None, params=None):
     headers = {
         "apiKey": SB_KEY, 
@@ -50,7 +90,7 @@ async def supabase_request_async(table, method="GET", json_data=None, params=Non
 def run_async(coroutine):
     return asyncio.run(coroutine)
 
-# 5. Secure Gmail OTP Routing Function
+# 6. Secure Gmail OTP Routing Function
 def send_real_gmail_otp(to_email, otp_code):
     try:
         msg = MIMEMultipart()
@@ -120,7 +160,6 @@ if "identity" not in st.session_state: st.session_state.identity = ""
 if "saved_pass_hash" not in st.session_state: st.session_state.saved_pass_hash = ""
 if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
 if "messages" not in st.session_state: st.session_state.messages = []
-if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
 
 # Keep registered user trace for quick relogin
 if "registered_email" not in st.session_state: st.session_state.registered_email = ""
@@ -165,7 +204,6 @@ with st.sidebar:
             st.session_state.username = ""
             st.session_state.identity = ""
             st.session_state.messages = []
-            st.session_state.whatsapp_url = ""
             st.rerun()
     else:
         st.warning("🔒 Terminal Locked.")
@@ -200,26 +238,28 @@ if st.session_state.app_mode == "Unauthorized":
                 else:
                     st.error("Invalid credentials token.")
                     
-    # 2. GUEST MODE (INCLUDES MOBILE NUMBER AND WHATSAPP REDIRECT)
+    # 2. GUEST MODE WITH 100% AUTOMATIC CELLULAR SMS DISPATCH
     elif auth_action == "🚀 Continue As Guest":
         with st.form("main_guest_form", clear_on_submit=False):
             guest_name = st.text_input("Enter Preferred Username", placeholder="Anonymous")
-            guest_phone = st.text_input("Enter Mobile Number (with country code)", placeholder="919876543210")
+            guest_phone = st.text_input("Enter Mobile Number (e.g., 9876543210)", placeholder="9876543210")
             guest_pass = st.text_input("Create Guest Password", type="password", placeholder="••••••••")
-            submit_guest = st.form_submit_button("Unlock Core & Send Key 🚀", use_container_width=True)
+            submit_guest = st.form_submit_button("Unlock Core Engine 🚀", use_container_width=True)
             
             if submit_guest and guest_name and guest_phone and guest_pass:
                 clean_user = guest_name.strip()
-                clean_phone = ''.join(filter(str.isdigit, guest_phone))
+                secure_guest_id = f"guest_{generate_secure_hash(clean_user.lower() + guest_pass)}"
                 
-                # Setup WhatsApp Password Dispatch parameters cleanly
-                sms_text = f"🔱 Aksharam AI Gateway Secured\nHello {clean_user}, your unique Guest Key is active.\n🔑 Password: {guest_pass}\n\nKeep it safe to reopen your timeline. Engineered by TMD."
-                encoded_sms = urllib.parse.quote(sms_text)
-                st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_sms}"
+                # Live Automatic Fast2SMS Trigger (Sends pure text message instantly)
+                with st.spinner("Broadcasting secure password token via cellular SMS..."):
+                    send_pure_cellular_sms(guest_phone, guest_pass, clean_user)
                 
+                db_check = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{secure_guest_id}", "limit": 1}))
+                
+                st.session_state.app_mode = "Connected"
                 st.session_state.username = clean_user
-                st.session_state.identity = f"guest_{generate_secure_hash(clean_user.lower() + guest_pass)}"
-                st.session_state.app_mode = "Guest_Redirect_Window"
+                st.session_state.identity = secure_guest_id
+                st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
                 st.rerun()
                 
     # 3. FIRST TIME MEMBER LOGIN (EMAIL + PASSWORD -> TRIGGERS OTP)
@@ -234,7 +274,6 @@ if st.session_state.app_mode == "Unauthorized":
                 otp = str(random.randint(100000, 999999))
                 st.session_state.generated_otp = otp
                 
-                # Cache parameters in state loop temporarily until OTP verification checks complete
                 st.session_state.registered_user = u_name.strip()
                 st.session_state.registered_email = u_target.strip().lower()
                 st.session_state.saved_pass_hash = generate_secure_hash(u_pass)
@@ -244,28 +283,6 @@ if st.session_state.app_mode == "Unauthorized":
                         st.session_state.app_mode = "OTP_Verification"
                         st.rerun()
                         
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
-# --- GUEST COMPONENT ACTION SCREEN ---
-elif st.session_state.app_mode == "Guest_Redirect_Window":
-    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #ff3300;'>📲 Secure Key Generation</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>તમારો સિક્યોરિટી પાસવર્ડ ફોન પર મેળવવા માટે નીચેના લીલા બટન પર ક્લિક કરો.</p>", unsafe_allow_html=True)
-    
-    st.markdown(f'''
-        <a href="{st.session_state.whatsapp_url}" target="_blank" style="text-decoration:none;">
-            <div style="background-color:#25D366; color:white; text-align:center; padding:15px; border-radius:10px; font-weight:bold; font-size:1.1rem; margin-bottom:25px; box-shadow: 0 4px 15px rgba(37,211,102,0.4);">
-                🟢 Receive Password via WhatsApp
-            </div>
-        </a>
-    ''', unsafe_allow_html=True)
-    
-    if st.button("Launch Core Engine 🚀", use_container_width=True):
-        st.session_state.app_mode = "Connected"
-        st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-        st.rerun()
-        
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
@@ -297,13 +314,6 @@ elif st.session_state.app_mode == "OTP_Verification":
 
 # --- ACTIVE MAIN CHAT PORTAL ENGINE ---
 st.markdown("<h1 style='text-align: center; color: #ff3300 !important;'>🔱 AKSHARAM CORE</h1>", unsafe_allow_html=True)
-st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>Greetings, {st.session_state.username}. The portal is live, trace thy dream...</h3>", unsafe_allow_html=True)
-
-def render_image_block(prompt_text):
-    encoded_prompt = urllib.parse.quote(prompt_text)
-    img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
-    html_layout = f'<div class="aksharam-image-container"><img src="{img_url}"><div style="text-align: center; background: #111;"><a href="{img_url}" download="Aksharam_AI.jpg" target="_blank" class="download-action-btn">📥 Download Full HD</a></div></div>'
-    st.markdown(html_layout, unsafe_allow_html=True)
 
 # Auto Cloud History Pull
 if not st.session_state.messages:
@@ -317,10 +327,7 @@ if not st.session_state.messages:
 for msg in st.session_state.messages:
     if msg["role"] == "system": continue
     with st.chat_message(msg["role"]):
-        if "||IMAGE_PROMPT||" in msg["content"]:
-            render_image_block(msg["content"].replace("||IMAGE_PROMPT||", "").strip())
-        else:
-            st.write(msg["content"])
+        st.write(msg["content"])
 
 # Poetic Stream Input
 if user_input := st.chat_input("Unleash your imagination into this blank scroll..."):
@@ -349,9 +356,6 @@ if user_input := st.chat_input("Unleash your imagination into this blank scroll.
                 full_response += chunk_text
                 stream_container.write(full_response)
                 
-        if "||IMAGE_PROMPT||" in full_response:
-            st.rerun()
-
         st.session_state.messages.append({"role": "assistant", "content": full_response})
         asyncio.run(supabase_request_async("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response}))
         st.rerun()
