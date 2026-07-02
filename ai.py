@@ -4,6 +4,7 @@ import httpx
 import random
 import smtplib
 import urllib.parse
+import asyncio
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -19,14 +20,33 @@ if all(key in st.secrets for key in REQUIRED_KEYS):
     GMAIL_SENDER = st.secrets["GMAIL_SENDER"]
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
     ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"].strip().lower()
-    MASTER_OTP = st.secrets.get("MASTER_OTP", "786786") # Kept safe via secrets
+    MASTER_OTP = st.secrets.get("MASTER_OTP", "786786")
 else:
-    st.error("Missing architecture keys or ADMIN_EMAIL inside Streamlit Secrets panel.")
+    st.error("Missing architecture keys inside Streamlit Secrets panel.")
     st.stop()
 
+# Initialize Sync Groq Client
 client = Groq(api_key=GROQ_KEY)
 
-# 3. Secure Gmail Routing Function
+# 3. Secure Async Supabase Engine (Non-Blocking)
+async def supabase_request_async(table, method="GET", json_data=None, params=None):
+    headers = {
+        "apiKey": SB_KEY, 
+        "Authorization": f"Bearer {SB_KEY}", 
+        "Content-Type": "application/json", 
+        "Prefer": "return=representation"
+    }
+    url = f"{SB_URL}/rest/v1/{table}"
+    async with httpx.AsyncClient() as cl:
+        if method == "POST": 
+            return await cl.post(url, headers=headers, json=json_data)
+        return await cl.get(url, headers=headers, params=params)
+
+def run_async(coroutine):
+    """Helper to execute async calls inside Streamlit's sync wrapper"""
+    return asyncio.run(coroutine)
+
+# 4. Secure Gmail Routing Function
 def send_real_gmail_otp(to_email, otp_code):
     try:
         msg = MIMEMultipart()
@@ -58,21 +78,7 @@ def send_real_gmail_otp(to_email, otp_code):
         st.error(f"Gmail Routing Link Error: {e}")
         return False
 
-# Supabase Request Handler
-def supabase_request(table, method="GET", json_data=None, params=None):
-    headers = {
-        "apiKey": SB_KEY, 
-        "Authorization": f"Bearer {SB_KEY}", 
-        "Content-Type": "application/json", 
-        "Prefer": "return=representation"
-    }
-    url = f"{SB_URL}/rest/v1/{table}"
-    with httpx.Client() as cl:
-        if method == "POST": 
-            return cl.post(url, headers=headers, json=json_data)
-        return cl.get(url, headers=headers, params=params)
-
-# Inject 3D Visual Styling & Fixed Embedded Copy Script Environment
+# Inject 3D Visual Styling Environment
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -81,14 +87,8 @@ vanta_3d_html = """
     VANTA.NET({el: "#vanta-bg", mouseControls: true, touchControls: true, minHeight: 200.00, minWidth: 200.00, scale: 1.00, color: 0xff3300, backgroundColor: 0x000000})
 </script>
 <style>
-    #MainMenu {visibility: hidden; display: none !important;}
-    header {visibility: hidden; display: none !important;}
-    footer {visibility: hidden; display: none !important;}
-    [data-testid="stAppDeployButton"] {display: none !important;}
-    [data-testid="stToolbar"] {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    [data-testid="stStatusWidget"] {display: none !important;}
-    .stDeployButton {display: none !important;}
+    #MainMenu, header, footer {visibility: hidden; display: none !important;}
+    [data-testid="stAppDeployButton"], [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] {display: none !important;}
 
     .stApp { background: transparent !important; }
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; border-right: 2px solid rgba(255, 51, 0, 0.3); }
@@ -97,14 +97,15 @@ vanta_3d_html = """
     h1, h2, h3, p, span, label { color: #ffffff !important; }
 
     .chat-row-container {
-        background-color: rgba(10, 10, 10, 0.85) !important; 
-        border-radius: 16px; 
-        border: 2px solid #ff3300 !important;
-        padding: 20px;
-        margin-bottom: 20px;
+        background-color: rgba(15, 15, 15, 0.9) !important; 
+        border-radius: 12px; 
+        border-left: 5px solid #ff3300 !important;
+        padding: 18px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    .label-heading-user { color: #ff3300 !important; font-weight: bold; font-size: 1.1rem; margin-bottom: 8px; }
-    .label-heading-ai { color: #ffffff !important; font-weight: bold; font-size: 1.1rem; margin-top: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .label-heading-user { color: #ff3300 !important; font-weight: bold; font-size: 1rem; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;}
+    .label-heading-ai { color: #ffffff !important; font-weight: bold; font-size: 1rem; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;}
 
     .aksharam-image-container { max-width: 550px !important; margin: 15px 0px; border-radius: 14px; border: 2px solid #ff3300; overflow: hidden; box-shadow: 0 8px 24px rgba(255,51,0,0.25); background: #0a0a0a; }
     .aksharam-image-container img { width: 100% !important; height: auto !important; object-fit: contain !important; }
@@ -210,7 +211,6 @@ elif st.session_state.app_mode == "OTP_Screen":
 
     st.write("Enter 6-Digit Code:")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    # Fixed matching keys order here
     with c1: b1 = st.text_input("", max_chars=1, key="b1", label_visibility="collapsed")
     with c2: b2 = st.text_input("", max_chars=1, key="b2", label_visibility="collapsed")
     with c3: b3 = st.text_input("", max_chars=1, key="b3", label_visibility="collapsed")
@@ -249,8 +249,9 @@ SYSTEM_PROMPT = (
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    db_res = supabase_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"})
-    if db_res.status_code == 200:
+    # Fetch log asynchronously on initiation
+    db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
+    if db_res and db_res.status_code == 200:
         for entry in db_res.json(): 
             st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
 
@@ -284,12 +285,10 @@ with st.sidebar:
     st.markdown("---")
     if st.button("🚪 Disconnect Core", use_container_width=True):
         st.session_state.app_mode = "Gateway"
-        if "messages" in st.session_state:
-            del st.session_state.messages
+        if "messages" in st.session_state: del st.session_state.messages
         st.rerun()
 
 st.title("🔱 Aksharam Core Engine")
-st.markdown(f"### Hi {st.session_state.username}, how can Aksharam help you today?")
 
 def render_image_block(prompt_text):
     encoded_prompt = urllib.parse.quote(prompt_text)
@@ -308,59 +307,55 @@ def render_image_block(prompt_text):
     '''
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Parse history into sequential pairs
-chat_history = [m for m in st.session_state.messages if m["role"] != "system"]
-paired_turns = []
-current_turn = {"user": None, "assistant": None}
-
-for msg in chat_history:
-    if msg["role"] == "user":
-        if current_turn["user"] is not None:
-            paired_turns.append(current_turn)
-            current_turn = {"user": None, "assistant": None}
-        current_turn["user"] = msg["content"]
-    elif msg["role"] == "assistant":
-        current_turn["assistant"] = msg["content"]
-        paired_turns.append(current_turn)
-        current_turn = {"user": None, "assistant": None}
-
-if current_turn["user"] is not None:
-    paired_turns.append(current_turn)
-
-# Structured View Engine
-for index, turn in enumerate(paired_turns, start=1):
-    st.markdown(f'<div class="chat-row-container">', unsafe_allow_html=True)
-    st.markdown(f'<div class="label-heading-user">Question {index}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div>{turn["user"]}</div><br>', unsafe_allow_html=True)
-    
-    if turn["assistant"] is not None:
-        if "||IMAGE_PROMPT||" in turn["assistant"]:
-            clean_prompt = turn["assistant"].replace("||IMAGE_PROMPT||", "").strip()
+# Render Chat History cleanly using Native Streamlit Chat Interface elements
+for msg in st.session_state.messages:
+    if msg["role"] == "system":
+        continue
+    with st.chat_message(msg["role"]):
+        if "||IMAGE_PROMPT||" in msg["content"]:
+            clean_prompt = msg["content"].replace("||IMAGE_PROMPT||", "").strip()
             render_image_block(clean_prompt)
         else:
-            # Replaced JS-dependent copy icon with native scannable UI layout 
-            st.markdown(f'<div class="label-heading-ai">Answer {index}</div>', unsafe_allow_html=True)
-            st.write(turn["assistant"])
-            
-    st.markdown('</div>', unsafe_allow_html=True)
+            st.write(msg["content"])
 
-# --- UNIVERSAL CHAT INPUT PIPELINE ---
+# --- UNIVERSAL CHAT INPUT PIPELINE WITH STREAMING & ASYNC LOGGING ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
+    # Render user prompt instantly
+    with st.chat_message("user"):
+        st.write(user_input)
+    
     st.session_state.messages.append({"role": "user", "content": user_input})
-    supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
+    
+    # Fire and forget async log to Supabase (Zero UI hanging)
+    asyncio.run(supabase_request_async("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input}))
+
+    # Implement Context Sliding Window: Keeps the System Prompt [0] + last 10 messages max
+    memory_window = [st.session_state.messages[0]] + st.session_state.messages[-10:] if len(st.session_state.messages) > 11 else st.session_state.messages
 
     try:
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile", 
-            messages=st.session_state.messages, 
-            temperature=0.3, 
-            stream=False
-        )
-        full_response = completion.choices[0].message.content
-        
+        with st.chat_message("assistant"):
+            # Extraordinary Feature: Active live text token streaming
+            stream_container = st.empty()
+            full_response = ""
+            
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile", 
+                messages=memory_window, 
+                temperature=0.3, 
+                stream=True # Streaming enabled!
+            )
+            
+            for chunk in completion:
+                chunk_text = chunk.choices[0].delta.content or ""
+                full_response += chunk_text
+                stream_container.write(full_response)
+                
+        # If the generated response turns out to be an image command, handle swap
+        if "||IMAGE_PROMPT||" in full_response:
+            st.rerun()
+
         st.session_state.messages.append({"role": "assistant", "content": full_response})
-        supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
-        st.rerun()
+        asyncio.run(supabase_request_async("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response}))
                 
     except Exception as e: 
         st.error(f"Cloud Routing Error: {e}")
