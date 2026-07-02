@@ -28,7 +28,7 @@ else:
 # Initialize Sync Groq Client
 client = Groq(api_key=GROQ_KEY)
 
-# 3. Secure Async Supabase Engine (Non-Blocking Back-End Operations)
+# 3. Secure Async Supabase Engine
 async def supabase_request_async(table, method="GET", json_data=None, params=None):
     headers = {
         "apiKey": SB_KEY, 
@@ -43,7 +43,6 @@ async def supabase_request_async(table, method="GET", json_data=None, params=Non
         return await cl.get(url, headers=headers, params=params)
 
 def run_async(coroutine):
-    """Helper to execute async calls inside Streamlit's sync runtime wrapper"""
     return asyncio.run(coroutine)
 
 # 4. Secure Gmail Routing Function
@@ -92,9 +91,10 @@ vanta_3d_html = """
 
     .stApp { background: transparent !important; }
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; border-right: 2px solid rgba(255, 51, 0, 0.3); }
-    .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 30px; border-radius: 15px; max-width: 500px; margin: 40px auto; box-shadow: 0 0 30px rgba(255, 51, 0, 0.3); }
+    .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 0 15px rgba(255, 51, 0, 0.2); }
     .quote-box { font-style: italic; color: #ff3300; text-align: center; margin-bottom: 20px; font-size: 1.1rem; font-weight: bold; }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
+    .poetic-title { font-family: 'Georgia', serif; font-style: italic; color: #ffffff !important; text-shadow: 0 0 10px rgba(255, 51, 0, 0.5); }
 
     .chat-row-container {
         background-color: rgba(15, 15, 15, 0.9) !important; 
@@ -102,235 +102,147 @@ vanta_3d_html = """
         border-left: 5px solid #ff3300 !important;
         padding: 18px;
         margin-bottom: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    .label-heading-user { color: #ff3300 !important; font-weight: bold; font-size: 1rem; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;}
-    .label-heading-ai { color: #ffffff !important; font-weight: bold; font-size: 1rem; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;}
-
-    .aksharam-image-container { max-width: 550px !important; margin: 15px 0px; border-radius: 14px; border: 2px solid #ff3300; overflow: hidden; box-shadow: 0 8px 24px rgba(255,51,0,0.25); background: #0a0a0a; }
-    .aksharam-image-container img { width: 100% !important; height: auto !important; object-fit: contain !important; }
-    .download-action-btn { display: inline-block; background-color: #ff3300; color: white !important; text-decoration: none !important; padding: 10px 20px; font-weight: bold; border-radius: 8px; margin: 12px; font-size: 0.95rem; text-align: center; }
 </style>
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
 # Session States initialization
-if "app_mode" not in st.session_state: st.session_state.app_mode = "Gateway"
+if "app_mode" not in st.session_state: st.session_state.app_mode = "Unauthorized"
 if "username" not in st.session_state: st.session_state.username = ""
 if "identity" not in st.session_state: st.session_state.identity = ""
 if "saved_pass" not in st.session_state: st.session_state.saved_pass = ""
 if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
 if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
-
-# --- APPLICATION CONTROLLER STATES ---
-if st.session_state.app_mode == "Gateway":
-    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-    st.markdown("<h1 style='text-align:center;'>🔱 Aksharam</h1>", unsafe_allow_html=True)
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🚀 Continue As Guest", use_container_width=True):
-            st.session_state.app_mode = "Guest_Setup"
-            st.rerun()
-    with col2:
-        if st.button("🔐 Login / Sign In", use_container_width=True):
-            st.session_state.app_mode = "Auth_Setup"
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
-elif st.session_state.app_mode == "Guest_Setup":
-    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-    st.title("Guest Terminal")
-    guest_name = st.text_input("Enter Your Preferred Name", placeholder="Anonymous")
-    if st.button("Initialize Session", use_container_width=True):
-        if guest_name:
-            clean_name = guest_name.strip().replace(" ", "_").lower()
-            st.session_state.username = guest_name
-            st.session_state.identity = f"guest_{clean_name}"
-            st.session_state.app_mode = "Connected"
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
-elif st.session_state.app_mode == "Auth_Setup":
-    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-    st.markdown("<div class='quote-box'>\"One step ahead with us.\"</div>", unsafe_allow_html=True)
-    st.subheader("Account Registration")
-    
-    channel = st.radio("Choose Verification Mode:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
-    u_name = st.text_input("Choose Username", placeholder="Your Name")
-    
-    u_target = ""
-    if channel == "Email Address":
-        u_target = st.text_input("Enter Target Email Address", placeholder="user@example.com")
-    else:
-        u_target = st.text_input("Enter WhatsApp Number (With Country Code)", placeholder="919876543210")
-        
-    u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
-
-    if st.button("Generate Verification Step", use_container_width=True):
-        if not u_name or not u_target or not u_pass:
-            st.error("All identification boxes are required.")
-        else:
-            otp = str(random.randint(100000, 999999))
-            st.session_state.generated_otp = otp
-            st.session_state.username = u_name
-            st.session_state.identity = u_target.strip().lower()
-            st.session_state.saved_pass = u_pass
-            
-            if channel == "Email Address":
-                with st.spinner("Dispatching email via Gmail..."):
-                    if send_real_gmail_otp(u_target, otp):
-                        st.session_state.app_mode = "OTP_Screen"
-                        st.rerun()
-            else:
-                clean_phone = ''.join(filter(str.isdigit, u_target))
-                message_text = f"🔱 Aksharam AI Security Gateway \nYour unique secure verification OTP is: {otp}\n\nEngineered by TMD."
-                encoded_message = urllib.parse.quote(message_text)
-                st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
-                st.session_state.app_mode = "OTP_Screen"
-                st.rerun()
-            
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
-elif st.session_state.app_mode == "OTP_Screen":
-    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
-    st.title("🔒 Verify Security Token")
-    st.write(f"Verification tracking reference: `{st.session_state.identity}`")
-    
-    if st.session_state.whatsapp_url:
-        st.markdown(f'''
-            <a href="{st.session_state.whatsapp_url}" target="_blank" style="text-decoration:none;">
-                <div style="background-color:#25D366; color:white; text-align:center; padding:12px; border-radius:10px; font-weight:bold; font-size:1.1rem; margin-bottom:25px; box-shadow: 0 4px 15px rgba(37,211,102,0.4);">
-                    🟢 Click to Open WhatsApp & Send Code
-                </div>
-            </a>
-        ''', unsafe_allow_html=True)
-
-    st.write("Enter 6-Digit Code:")
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    with c1: b1 = st.text_input("", max_chars=1, key="b1", label_visibility="collapsed")
-    with c2: b2 = st.text_input("", max_chars=1, key="b2", label_visibility="collapsed")
-    with c3: b3 = st.text_input("", max_chars=1, key="b3", label_visibility="collapsed")
-    with c4: b4 = st.text_input("", max_chars=1, key="b4", label_visibility="collapsed")
-    with c5: b5 = st.text_input("", max_chars=1, key="b5", label_visibility="collapsed")
-    with c6: b6 = st.text_input("", max_chars=1, key="b6", label_visibility="collapsed")
-    
-    full_user_otp = f"{b1}{b2}{b3}{b4}{b5}{b6}"
-            
-    if st.button("Verify Credentials & Deploy Core", use_container_width=True):
-        if full_user_otp == st.session_state.generated_otp or full_user_otp == MASTER_OTP:
-            st.session_state.app_mode = "Connected"
-            st.success("Verification complete!")
-            st.rerun()
-        else:
-            st.error("Security authorization passcode mismatch.")
-            
-    if st.button("⬅️ Back / Edit Details", use_container_width=True):
-        st.session_state.whatsapp_url = "" 
-        st.session_state.app_mode = "Auth_Setup"
-        st.rerun()
-            
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
+if "messages" not in st.session_state: st.session_state.messages = []
 
 # --- EXTRAORDINARY MAIN ACTIVE SYSTEM CORE ---
 SYSTEM_PROMPT = (
     f"Your name is Aksharam, a world-class premium AI assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
-    f"Current User: {st.session_state.username}.\n\n"
+    f"Current User: {st.session_state.username if st.session_state.username else 'Seeker'}.\n\n"
     f"CRITICAL CORE EXECUTION RULES:\n"
-    f"1. TIME AWARENESS: The current year is strictly 2026. All real-time facts, ages, and timelines must align mathematically with 2026.\n"
-    f"2. ZERO HALLUCINATION POLICY: Never provide fake information, unverified data, or broken code parameters. If you are highly uncertain about a fact or logic, provide a calculated, helpful, and highly precise professional response. Do NOT guess or hallucinate.\n"
-    f"3. FLUID MULTI-LINGUAL MATRIX: Detect and match the user's language instantly (Gujarati, Hindi, English, etc.). Respond with native fluency, proper grammar, and immaculate vocabulary. No robotic or broken translations.\n"
-    f"4. HIGHLY PROFESSIONAL TONALITY: Always be helpful, sophisticated, and direct. Avoid useless fluff. Provide clear layouts, bullet points, or bold text to make your answers easy to scan and read instantly.\n"
-    f"5. CODE & LOGIC ACCURACY: When providing code or technical solutions, ensure they are optimized, modern, clean, and bug-free.\n"
-    f"6. IMAGE GENERATION PROTOCOL: ONLY trigger an image if the user explicitly orders you to 'create an image', 'draw', 'generate an image', or 'visualize'. "
-    f"In that exact case, output ONLY this pattern: '||IMAGE_PROMPT|| <detailed English description of the art>' and absolutely nothing else."
+    f"1. TIME AWARENESS: The current year is strictly 2026.\n"
+    f"2. ZERO HALLUCINATION POLICY: Never provide fake information or unverified data.\n"
+    f"3. FLUID MULTI-LINGUAL MATRIX: Match user's language instantly with immaculate fluency.\n"
+    f"4. HIGHLY PROFESSIONAL TONALITY: Sophisticated, clean structure, clear layouts, using bullet points or bold text.\n"
+    f"5. IMAGE GENERATION PROTOCOL: If asked to create/draw/generate an image, output ONLY: '||IMAGE_PROMPT|| <detailed English description>' and nothing else."
 )
 
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
-    if db_res and db_res.status_code == 200:
-        for entry in db_res.json(): 
-            st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
-
-current_identity = st.session_state.identity.strip().lower()
-
+# SIDEBAR ARCHITECTURE (Direct Option Controls)
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
-    st.markdown(f"*✨ Your imagination rules this realm, {st.session_state.username}...*")
-    if current_identity == ADMIN_EMAIL:
-        st.success("🟢 ADMIN CLEARANCE GRANTED")
-    else:
-        st.warning("🟡 ACCESS CLEARED")
     
-    st.markdown("---")
-    if st.button("➕ New Chat Session", use_container_width=True):
-        st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        st.rerun()
+    if st.session_state.app_mode == "Unauthorized":
+        st.info("✨ Terminal Locked. Initialize via gateway options below.")
+        auth_action = st.radio("Choose Matrix Entry:", ["Select Mode", "🚀 Continue As Guest", "🔐 Login / Sign In"])
         
-    st.markdown("---")
-    st.markdown("💬 **Active Matrix History**")
-    
-    user_queries = [m["content"] for m in st.session_state.messages if m["role"] == "user"]
-    if user_queries:
-        first_topic = user_queries[0]
-        short_title = first_topic[:22] + "..." if len(first_topic) > 22 else first_topic
-        st.markdown(f"✨ **`{short_title}`**")
-        st.caption(f"💾 save_chat.dat ({len(st.session_state.messages) - 1} layers logged)")
-    else:
-        st.caption("✨ *New session ready...*")
+        if auth_action == "🚀 Continue As Guest":
+            guest_name = st.text_input("Preferred Name", placeholder="Anonymous")
+            if st.button("Unlock Core", use_container_width=True):
+                if guest_name:
+                    st.session_state.username = guest_name.strip()
+                    st.session_state.identity = f"guest_{guest_name.strip().lower()}"
+                    st.session_state.app_mode = "Connected"
+                    st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+                    st.rerun()
+                    
+        elif auth_action == "🔐 Login / Sign In":
+            channel = st.radio("Verification Mode:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
+            u_name = st.text_input("Choose Username", placeholder="Your Name")
+            u_target = st.text_input("Target Email / WhatsApp Number", placeholder="user@example.com / 919876543210")
+            u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
+            
+            if st.button("Generate Token", use_container_width=True):
+                if u_name and u_target and u_pass:
+                    otp = str(random.randint(100000, 999999))
+                    st.session_state.generated_otp = otp
+                    st.session_state.username = u_name
+                    st.session_state.identity = u_target.strip().lower()
+                    st.session_state.saved_pass = u_pass
+                    
+                    if channel == "Email Address":
+                        if send_real_gmail_otp(st.session_state.identity, otp):
+                            st.session_state.app_mode = "OTP_Verification"
+                            st.rerun()
+                    else:
+                        clean_phone = ''.join(filter(str.isdigit, u_target))
+                        message_text = f"🔱 Aksharam AI Security Gateway \nYour verification OTP is: {otp}\n\nEngineered by TMD."
+                        encoded_message = urllib.parse.quote(message_text)
+                        st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
+                        st.session_state.app_mode = "OTP_Verification"
+                        st.rerun()
+                        
+    elif st.session_state.app_mode == "OTP_Verification":
+        st.warning("🔒 Token Verification Window")
+        if st.session_state.whatsapp_url:
+            st.markdown(f'<a href="{st.session_state.whatsapp_url}" target="_blank"><div style="background-color:#25D366; color:white; text-align:center; padding:8px; border-radius:5px; font-weight:bold; font-size:0.9rem; margin-bottom:10px;">🟢 Open WhatsApp</div></a>', unsafe_allow_html=True)
         
-    st.markdown("---")
-    if st.button("🚪 Disconnect Core", use_container_width=True):
-        st.session_state.app_mode = "Gateway"
-        if "messages" in st.session_state: del st.session_state.messages
-        st.rerun()
+        user_otp = st.text_input("Enter 6-Digit Code", max_chars=6)
+        if st.button("Verify & Launch Core", use_container_width=True):
+            if user_otp == st.session_state.generated_otp or user_otp == MASTER_OTP:
+                st.session_state.app_mode = "Connected"
+                st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+                # Async History fetch
+                db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
+                if db_res and db_res.status_code == 200:
+                    for entry in db_res.json(): 
+                        st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
+                st.rerun()
+            else:
+                st.error("Mismatch code token.")
+        if st.button("⬅️ Abort Matrix", use_container_width=True):
+            st.session_state.app_mode = "Unauthorized"
+            st.rerun()
+            
+    elif st.session_state.app_mode == "Connected":
+        st.success(f"🟢 ACTIVE MATRIX: {st.session_state.username}")
+        if st.session_state.identity.startswith(ADMIN_EMAIL):
+            st.success("🔱 ADMIN CLEARANCE DETECTED")
+        st.markdown("---")
+        if st.button("➕ New Chat Matrix", use_container_width=True):
+            st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            st.rerun()
+        if st.button("🚪 Disconnect Matrix Engine", use_container_width=True):
+            st.session_state.app_mode = "Unauthorized"
+            st.session_state.username = ""
+            st.session_state.identity = ""
+            st.session_state.messages = []
+            st.rerun()
 
-st.title("🔱 Aksharam Core Engine")
+# --- MAIN DISPLAY SCREEN ENGINE ---
+st.markdown("<h1 style='text-align: center; color: #ff3300 !important;'>🔱 AKSHARAM CORE</h1>", unsafe_allow_html=True)
+
+# Poetic Welcome Titles
+if st.session_state.app_mode == "Connected":
+    st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>Greetings, {st.session_state.username}. Speak thy mind, trace thy dream...</h3>", unsafe_allow_html=True)
+else:
+    st.markdown("<h3 class='poetic-title' style='text-align: center;'>The terminal is silent, waiting for the spark of your name... (Select Guest or Login inside the sidebar to awaken the core)</h3>", unsafe_allow_html=True)
 
 def render_image_block(prompt_text):
     encoded_prompt = urllib.parse.quote(prompt_text)
     img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
-    
-    st.info(f"🎨 Visual matrix deployed for prompt: *{prompt_text}*")
-    html_layout = f'''
-    <div class="aksharam-image-container">
-        <img src="{img_url}" alt="Aksharam AI Generated Output">
-        <div style="text-align: center; background: #111; padding: 5px 0px;">
-            <a href="{img_url}" download="Aksharam_AI_Output.jpg" target="_blank" class="download-action-btn">
-                📥 Download Full HD Image
-            </a>
-        </div>
-    </div>
-    '''
+    html_layout = f'<div class="aksharam-image-container"><img src="{img_url}"><div style="text-align: center; background: #111;"><a href="{img_url}" download="Aksharam_AI.jpg" target="_blank" class="download-action-btn">📥 Download Full HD</a></div></div>'
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Clean Native Chat Interface Rendering Loop
+# Clean Chat History Display
 for msg in st.session_state.messages:
-    if msg["role"] == "system":
-        continue
+    if msg["role"] == "system": continue
     with st.chat_message(msg["role"]):
         if "||IMAGE_PROMPT||" in msg["content"]:
-            clean_prompt = msg["content"].replace("||IMAGE_PROMPT||", "").strip()
-            render_image_block(clean_prompt)
+            render_image_block(msg["content"].replace("||IMAGE_PROMPT||", "").strip())
         else:
             st.write(msg["content"])
 
-# --- UNIVERSAL CHAT INPUT PIPELINE WITH TOKEN STREAMING & LOGGING ---
-if user_input := st.chat_input("Query Aksharam Framework..."):
+# --- POETIC CHAT INPUT GATEWAY ---
+poetic_placeholder = "Unleash your imagination into this blank scroll, what matrix shall we weave today?..." if st.session_state.app_mode == "Connected" else "🔒 Core Engine Locked. Unlock via Sidebar Matrix Controller..."
+
+if user_input := st.chat_input(poetic_placeholder, disabled=(st.session_state.app_mode != "Connected")):
     with st.chat_message("user"):
         st.write(user_input)
     
     st.session_state.messages.append({"role": "user", "content": user_input})
-    
-    # Asynchronous non-blocking log transfer to database
     asyncio.run(supabase_request_async("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input}))
 
-    # Token Window Limiter (System Prompt + last 10 messages context max)
     memory_window = [st.session_state.messages[0]] + st.session_state.messages[-10:] if len(st.session_state.messages) > 11 else st.session_state.messages
 
     try:
@@ -341,8 +253,8 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
                 messages=memory_window, 
-                temperature=0.1,  # Lowered temperature for perfect hyper-focused accuracy
-                stream=True       # Realtime text streaming enabled
+                temperature=0.1, 
+                stream=True
             )
             
             for chunk in completion:
