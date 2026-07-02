@@ -28,7 +28,7 @@ else:
 # Initialize Sync Groq Client
 client = Groq(api_key=GROQ_KEY)
 
-# 3. Secure Async Supabase Engine (Non-Blocking)
+# 3. Secure Async Supabase Engine (Non-Blocking Back-End Operations)
 async def supabase_request_async(table, method="GET", json_data=None, params=None):
     headers = {
         "apiKey": SB_KEY, 
@@ -43,7 +43,7 @@ async def supabase_request_async(table, method="GET", json_data=None, params=Non
         return await cl.get(url, headers=headers, params=params)
 
 def run_async(coroutine):
-    """Helper to execute async calls inside Streamlit's sync wrapper"""
+    """Helper to execute async calls inside Streamlit's sync runtime wrapper"""
     return asyncio.run(coroutine)
 
 # 4. Secure Gmail Routing Function
@@ -236,20 +236,22 @@ elif st.session_state.app_mode == "OTP_Screen":
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- MAIN ACTIVE SYSTEM CORE ---
+# --- EXTRAORDINARY MAIN ACTIVE SYSTEM CORE ---
 SYSTEM_PROMPT = (
-    f"Your name is Aksharam, an assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
-    f"Assisting user: {st.session_state.username}. "
-    f"CRITICAL SYSTEM SETTINGS:\n"
-    f"1. Current Year: 2026.\n"
-    f"2. Language Match Mode: Reply fluidly in the language used or explicitly requested by the user.\n"
-    f"3. IMAGE GENERATION PROTOCOL: ONLY generate an image if the user explicitly orders you to 'create an image', 'draw', 'generate an image', or 'visualize'. "
-    f"If they explicitly request a visual, you must respond with EXACTLY this special pattern: '||IMAGE_PROMPT|| <detailed English description of the art>' and absolutely nothing else."
+    f"Your name is Aksharam, a world-class premium AI assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
+    f"Current User: {st.session_state.username}.\n\n"
+    f"CRITICAL CORE EXECUTION RULES:\n"
+    f"1. TIME AWARENESS: The current year is strictly 2026. All real-time facts, ages, and timelines must align mathematically with 2026.\n"
+    f"2. ZERO HALLUCINATION POLICY: Never provide fake information, unverified data, or broken code parameters. If you are highly uncertain about a fact or logic, provide a calculated, helpful, and highly precise professional response. Do NOT guess or hallucinate.\n"
+    f"3. FLUID MULTI-LINGUAL MATRIX: Detect and match the user's language instantly (Gujarati, Hindi, English, etc.). Respond with native fluency, proper grammar, and immaculate vocabulary. No robotic or broken translations.\n"
+    f"4. HIGHLY PROFESSIONAL TONALITY: Always be helpful, sophisticated, and direct. Avoid useless fluff. Provide clear layouts, bullet points, or bold text to make your answers easy to scan and read instantly.\n"
+    f"5. CODE & LOGIC ACCURACY: When providing code or technical solutions, ensure they are optimized, modern, clean, and bug-free.\n"
+    f"6. IMAGE GENERATION PROTOCOL: ONLY trigger an image if the user explicitly orders you to 'create an image', 'draw', 'generate an image', or 'visualize'. "
+    f"In that exact case, output ONLY this pattern: '||IMAGE_PROMPT|| <detailed English description of the art>' and absolutely nothing else."
 )
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    # Fetch log asynchronously on initiation
     db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
     if db_res and db_res.status_code == 200:
         for entry in db_res.json(): 
@@ -307,7 +309,7 @@ def render_image_block(prompt_text):
     '''
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Render Chat History cleanly using Native Streamlit Chat Interface elements
+# Clean Native Chat Interface Rendering Loop
 for msg in st.session_state.messages:
     if msg["role"] == "system":
         continue
@@ -318,31 +320,29 @@ for msg in st.session_state.messages:
         else:
             st.write(msg["content"])
 
-# --- UNIVERSAL CHAT INPUT PIPELINE WITH STREAMING & ASYNC LOGGING ---
+# --- UNIVERSAL CHAT INPUT PIPELINE WITH TOKEN STREAMING & LOGGING ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
-    # Render user prompt instantly
     with st.chat_message("user"):
         st.write(user_input)
     
     st.session_state.messages.append({"role": "user", "content": user_input})
     
-    # Fire and forget async log to Supabase (Zero UI hanging)
+    # Asynchronous non-blocking log transfer to database
     asyncio.run(supabase_request_async("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input}))
 
-    # Implement Context Sliding Window: Keeps the System Prompt [0] + last 10 messages max
+    # Token Window Limiter (System Prompt + last 10 messages context max)
     memory_window = [st.session_state.messages[0]] + st.session_state.messages[-10:] if len(st.session_state.messages) > 11 else st.session_state.messages
 
     try:
         with st.chat_message("assistant"):
-            # Extraordinary Feature: Active live text token streaming
             stream_container = st.empty()
             full_response = ""
             
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
                 messages=memory_window, 
-                temperature=0.3, 
-                stream=True # Streaming enabled!
+                temperature=0.1,  # Lowered temperature for perfect hyper-focused accuracy
+                stream=True       # Realtime text streaming enabled
             )
             
             for chunk in completion:
@@ -350,7 +350,6 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
                 full_response += chunk_text
                 stream_container.write(full_response)
                 
-        # If the generated response turns out to be an image command, handle swap
         if "||IMAGE_PROMPT||" in full_response:
             st.rerun()
 
