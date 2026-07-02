@@ -258,7 +258,7 @@ SYSTEM_PROMPT = (
     f"CRITICAL SYSTEM SETTINGS:\n"
     f"1. The current year is 2026. Evaluate all timelines, facts, and events up to the year 2026.\n"
     f"2. Language Match Mode: Reply fluidly in the language used or explicitly requested by the user.\n"
-    f"3. IMAGE GENERATION PROTOCOL: If the user explicitly asks to create, draw, generate, or visualize an image (even in Gujarati like 'ચિત્ર બનાવો'), "
+    f"3. IMAGE GENERATION PROTOCOL: If the user explicitly asks to create, draw, generate, or visualize an image, "
     f"you must respond with EXACTLY this special pattern: '||IMAGE_PROMPT|| <detailed English description of the art>' and absolutely nothing else. "
     f"You must translate their request into a highly detailed, cinematic, high-resolution descriptive art prompt in English so the generator understands it perfectly."
 )
@@ -273,13 +273,12 @@ current_identity = st.session_state.identity.strip().lower()
 
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
-    st.markdown(f"**Operator:** `{st.session_state.username}`")
+    # Poetic transformation applied directly to the universe core setup
+    st.markdown(f"*✨ Your imagination rules this realm, {st.session_state.username}...*")
     if current_identity == ADMIN_EMAIL:
         st.success("🟢 ADMIN CLEARANCE GRANTED")
     else:
         st.warning("🟡 GUEST CLEARANCE ONLY")
-    st.markdown("---")
-    st.markdown("💡 **Tip:** Say: *'Create an image of a golden trident'* or *'સિંહનું ચિત્ર બનાવો'*")
     st.markdown("---")
     if st.button("🔒 Secure Session Exit", use_container_width=True):
         st.session_state.app_mode = "Gateway"
@@ -296,7 +295,6 @@ def render_image_block(prompt_text):
     
     st.info(f"🎨 Visual matrix deployed for prompt: *{prompt_text}*")
     
-    # Custom HTML layout frame containing optimized container with sharp image scaling and download buttons
     html_layout = f'''
     <div class="aksharam-image-container">
         <img src="{img_url}" alt="Aksharam AI Generated Output">
@@ -340,7 +338,6 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
                     full_response += chunk.choices[0].delta.content
                     response_placeholder.markdown(full_response + "▌")
             
-            # Check if the generated response triggered our image protocol
             if "||IMAGE_PROMPT||" in full_response:
                 clean_prompt = full_response.replace("||IMAGE_PROMPT||", "").strip()
                 response_placeholder.empty()
