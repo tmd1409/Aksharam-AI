@@ -1,4 +1,9 @@
-import streamlit as st
+# We need to add a "New Chat" button to the sidebar. 
+# Clicking it should clear the current session chat messages so a fresh page is opened, 
+# but it won't delete the history from Supabase, so when they log in next time, they can still access it.
+# Also, we need to change the folder logo icon/layout inside the sidebar as requested.
+
+script_content = """import streamlit as st
 from groq import Groq
 import httpx
 import random
@@ -32,7 +37,7 @@ def send_real_gmail_otp(to_email, otp_code):
         msg['To'] = to_email
         msg['Subject'] = "🔱 Aksharam AI - Secure 6-Digit OTP Code"
         
-        body = f"""
+        body = f\"\"\"
         <html>
             <body style="font-family: Arial, sans-serif; background-color: #000; color: #fff; padding: 20px; border: 2px solid #ff3300; border-radius: 10px;">
                 <h2 style="color: #ff3300; text-align: center;">🔱 Aksharam AI Verification Gateway</h2>
@@ -45,7 +50,7 @@ def send_real_gmail_otp(to_email, otp_code):
                 <p>This code expires shortly.</p>
             </body>
         </html>
-        """
+        \"\"\"
         msg.attach(MIMEText(body, 'html'))
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
@@ -66,7 +71,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
         return cl.get(url, headers=headers, params=params)
 
 # Inject 3D Visual Styling & CLEAN UI OVERRIDES WITH SHARP IMAGE LAYOUT MANAGEMENT
-vanta_3d_html = """
+vanta_3d_html = \"\"\"
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js"></script>
@@ -126,7 +131,7 @@ vanta_3d_html = """
         transform: translateY(-2px);
     }
 </style>
-"""
+\"\"\"
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
 if "app_mode" not in st.session_state: st.session_state.app_mode = "Gateway"
@@ -162,7 +167,6 @@ elif st.session_state.app_mode == "Guest_Setup":
         if guest_name:
             clean_name = guest_name.strip().replace(" ", "_").lower()
             st.session_state.username = guest_name
-            # Giving them a persistent custom guest string so if they type the same name, it retrieves their data
             st.session_state.identity = f"guest_{clean_name}"
             st.session_state.app_mode = "Connected"
             st.rerun()
@@ -202,7 +206,7 @@ elif st.session_state.app_mode == "Auth_Setup":
                         st.rerun()
             else:
                 clean_phone = ''.join(filter(str.isdigit, u_target))
-                message_text = f"🔱 Aksharam AI Security Gateway \nYour unique secure verification OTP is: {otp}\n\nEngineered by TMD."
+                message_text = f"🔱 Aksharam AI Security Gateway \\nYour unique secure verification OTP is: {otp}\\n\\nEngineered by TMD."
                 encoded_message = urllib.parse.quote(message_text)
                 
                 st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
@@ -257,15 +261,14 @@ elif st.session_state.app_mode == "OTP_Screen":
 SYSTEM_PROMPT = (
     f"Your name is Aksharam, an elite super-assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
     f"Assisting user: {st.session_state.username}. "
-    f"CRITICAL SYSTEM SETTINGS:\n"
-    f"1. The current year is 2026. Evaluate all timelines, facts, and events up to the year 2026.\n"
-    f"2. Language Match Mode: Reply fluidly in the language used or explicitly requested by the user.\n"
+    f"CRITICAL SYSTEM SETTINGS:\\n"
+    f"1. The current year is 2026. Evaluate all timelines, facts, and events up to the year 2026.\\n"
+    f"2. Language Match Mode: Reply fluidly in the language used or explicitly requested by the user.\\n"
     f"3. IMAGE GENERATION PROTOCOL: If the user explicitly asks to create, draw, generate, or visualize an image, "
     f"you must respond with EXACTLY this special pattern: '||IMAGE_PROMPT|| <detailed English description of the art>' and absolutely nothing else. "
     f"You must translate their request into a highly detailed, cinematic, high-resolution descriptive art prompt in English so the generator understands it perfectly."
 )
 
-# Fetch Previous Data Globally to secure instant message recall across separate devices
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     db_res = supabase_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"})
@@ -284,20 +287,27 @@ with st.sidebar:
         st.warning("🟡 ACCESS CLEARED")
     
     st.markdown("---")
-    st.markdown("📂 **Saved Work Matrix**")
     
-    # Building a dynamic "Folder" listing structure based on the very first user message
+    # ➕ ADD NEW CHAT BUTTON LAYER
+    if st.button("➕ New Chat Session", use_container_width=True):
+        # Resets the active view locally to open a fresh page instantly
+        st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        st.rerun()
+        
+    st.markdown("---")
+    st.markdown("💬 **Active Matrix History**")
+    
     user_queries = [m["content"] for m in st.session_state.messages if m["role"] == "user"]
     if user_queries:
         first_topic = user_queries[0]
         short_title = first_topic[:22] + "..." if len(first_topic) > 22 else first_topic
-        st.markdown(f"📁 **`{short_title}`**")
-        st.caption(f"📄 save_chat_log.dat ({len(st.session_state.messages) - 1} logs recovered)")
+        # 👑 LOGO UPDATE: Swapped old folder logo icon out for clean dynamic interaction text icon indicators
+        st.markdown(f"✨ **`{short_title}`**")
+        st.caption(f"💾 save_chat.dat ({len(st.session_state.messages) - 1} layers logged)")
     else:
-        st.caption("📁 *No directories established yet.*")
+        st.caption("✨ *New session ready...*")
         
     st.markdown("---")
-    # Clean, minimalist, and highly effective exit button variant
     if st.button("🚪 Disconnect Core", use_container_width=True):
         st.session_state.app_mode = "Gateway"
         if "messages" in st.session_state:
@@ -369,8 +379,12 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
             
-            # Force UI update to ensure folders adapt immediately on the very first message
             if len(user_queries) == 0:
                 st.rerun()
                 
         except Exception as e: st.error(f"Cloud Routing Error: {e}")
+"""
+
+with open("ai.py", "w", encoding="utf-8") as f:
+    f.write(script_content)
+print("File successfully updated.")
