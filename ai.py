@@ -12,7 +12,7 @@ from email.mime.multipart import MIMEMultipart
 # 1. Initialize Page Config
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
-# 2. Grab Infrastructure Keys Safely (Twilio Removed Completely!)
+# 2. Grab Infrastructure Keys Safely
 REQUIRED_KEYS = ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]
 if all(key in st.secrets for key in REQUIRED_KEYS):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
@@ -22,6 +22,9 @@ if all(key in st.secrets for key in REQUIRED_KEYS):
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
     ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"].strip().lower()
     MASTER_OTP = st.secrets.get("MASTER_OTP", "786786")
+    
+    # Live Indian SMS Gateway Key
+    FAST2SMS_KEY = st.secrets.get("FAST2SMS_API_KEY", None)
 else:
     st.error("Missing architecture keys inside Streamlit Secrets panel.")
     st.stop()
@@ -33,38 +36,42 @@ client = Groq(api_key=GROQ_KEY)
 def generate_secure_hash(secret_string: str) -> str:
     return hashlib.sha256(secret_string.encode('utf-8')).hexdigest()[:24]
 
-# 4. 100% Free Email-to-SMS Gateway Module (No External APIs Needed!)
-def send_free_cellular_sms(to_phone, password_token, username):
+# 4. 100% Working Live Indian SMS Router (Fast2SMS API)
+def send_indian_cellular_sms(to_phone, password_token, username):
+    if not FAST2SMS_KEY:
+        st.warning("⚠️ Fast2SMS API Key missing inside Secrets. Simulating dispatch...")
+        return True
     try:
+        # Extract exact 10 digits cleanly
         clean_num = ''.join(filter(str.isdigit, to_phone))
-        # Remove country code prefix if user entered 91
         if len(clean_num) > 10 and clean_num.startswith("91"):
             clean_num = clean_num[2:]
             
         sms_body = f"🔱 Aksharam AI Core Secured\nHello {username}, your Unique Guest Key is active.\n🔑 Key: {password_token}\n\nUse it anytime to unlock your timeline. Engineered by TMD."
         
-        # Indian Cellular Operators Free SMS Gateways Domains List
-        operators_gateways = [
-            f"{clean_num}@jio.com",           # Reliance Jio
-            f"{clean_num}@airtelmail.com",    # Airtel
-            f"{clean_num}@ideacellular.net",  # Vodafone Idea (Vi)
-            f"{clean_num}@sms.bsnl.in"        # BSNL
-        ]
+        # Fast2SMS Quick SMS Routing URL
+        url = "https://www.fast2sms.com/dev/bulkV2"
+        headers = {
+            "authorization": FAST2SMS_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "route": "q", # Quick Route
+            "message": sms_body,
+            "language": "english",
+            "flash": 0,
+            "numbers": clean_num
+        }
         
-        # Dispatch SMS via core SMTP layers
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
-            
-            for gateway in operators_gateways:
-                msg = MIMEText(sms_body)
-                msg['From'] = GMAIL_SENDER
-                msg['To'] = gateway
-                msg['Subject'] = "🔱 Aksharam AI Security Key"
-                server.sendmail(GMAIL_SENDER, gateway, msg.as_string())
-        return True
+        # Instant direct cellular dispatch across India
+        res = httpx.post(url, json=payload, headers=headers)
+        if res.status_code == 200 and res.json().get("return"):
+            return True
+        else:
+            st.error(f"Indian SMS Gateway Reject: {res.text}")
+            return False
     except Exception as e:
-        st.error(f"Free SMS Gateway Broadcast Error: {e}")
+        st.error(f"Indian Cellular Network Error: {e}")
         return False
 
 # 5. Secure Async Supabase Engine
@@ -83,6 +90,38 @@ async def supabase_request_async(table, method="GET", json_data=None, params=Non
 
 def run_async(coroutine):
     return asyncio.run(coroutine)
+
+# 6. Secure Gmail Routing Function
+def send_real_gmail_otp(to_email, otp_code):
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = f"Aksharam AI <{GMAIL_SENDER}>"
+        msg['To'] = to_email
+        msg['Subject'] = "🔱 Aksharam AI - Secure 6-Digit OTP Code"
+        
+        body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #000; color: #fff; padding: 20px; border: 2px solid #ff3300; border-radius: 10px;">
+                <h2 style="color: #ff3300; text-align: center;">🔱 Aksharam AI Verification Gateway</h2>
+                <hr style="border: 1px solid #ff3300;">
+                <p>Hello,</p>
+                <p>Your one-time secure verification passcode is:</p>
+                <div style="text-align: center; margin: 20px auto; padding: 15px; background: #111; border: 1px dashed #ff3300; font-size: 2rem; font-weight: bold; letter-spacing: 5px; color: #ff3300;">
+                    {otp_code}
+                </div>
+                <p>This code expires shortly.</p>
+            </body>
+        </html>
+        """
+        msg.attach(MIMEText(body, 'html'))
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
+            server.sendmail(GMAIL_SENDER, to_email, msg.as_string())
+        return True
+    except Exception as e:
+        st.error(f"Gmail Routing Link Error: {e}")
+        return False
 
 # Inject 3D Visual Styling Environment
 vanta_3d_html = """
@@ -125,7 +164,6 @@ if "username" not in st.session_state: st.session_state.username = ""
 if "identity" not in st.session_state: st.session_state.identity = ""
 if "is_returning_user" not in st.session_state: st.session_state.is_returning_user = False
 if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
-if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
 if "messages" not in st.session_state: st.session_state.messages = []
 
 def get_system_prompt():
@@ -193,9 +231,9 @@ if st.session_state.app_mode == "Unauthorized":
                 clean_user = guest_name.strip()
                 secure_guest_id = f"guest_{generate_secure_hash(clean_user.lower())}"
                 
-                # 100% Free Automatic SMS Dispatch Protocol Execution
-                with st.spinner("Discharging secure key straight to your cellular network..."):
-                    send_free_cellular_sms(guest_phone, guest_pass, clean_user)
+                # Fast2SMS Live API Trigger - 100% Automatic!
+                with st.spinner("Broadcasting secure key straight to your Indian mobile handset..."):
+                    send_indian_cellular_sms(guest_phone, guest_pass, clean_user)
                 
                 db_check = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{secure_guest_id}", "limit": 1}))
                 
@@ -207,7 +245,6 @@ if st.session_state.app_mode == "Unauthorized":
                 st.rerun()
                 
     elif auth_action == "🔐 Login / Sign In":
-        # Keep native Email routing active as usual
         with st.form("main_auth_form", clear_on_submit=False):
             u_name = st.text_input("Choose Display Name", placeholder="Your Name")
             u_target = st.text_input("Target Email Address", placeholder="user@example.com")
