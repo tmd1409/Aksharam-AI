@@ -5,6 +5,7 @@ import random
 import smtplib
 import urllib.parse
 import asyncio
+import hashlib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -28,7 +29,12 @@ else:
 # Initialize Sync Groq Client
 client = Groq(api_key=GROQ_KEY)
 
-# 3. Secure Async Supabase Engine
+# 3. Cryptographic Token Generator for High Security Matrix
+def generate_secure_hash(secret_string: str) -> str:
+    """Creates a military-grade SHA-256 hash to anonymize tracking IDs"""
+    return hashlib.sha256(secret_string.encode('utf-8')).hexdigest()[:20]
+
+# 4. Secure Async Supabase Engine
 async def supabase_request_async(table, method="GET", json_data=None, params=None):
     headers = {
         "apiKey": SB_KEY, 
@@ -45,7 +51,7 @@ async def supabase_request_async(table, method="GET", json_data=None, params=Non
 def run_async(coroutine):
     return asyncio.run(coroutine)
 
-# 4. Secure Gmail Routing Function
+# 5. Secure Gmail Routing Function with TLS Encryption
 def send_real_gmail_otp(to_email, otp_code):
     try:
         msg = MIMEMultipart()
@@ -91,7 +97,7 @@ vanta_3d_html = """
 
     .stApp { background: transparent !important; }
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; border-right: 2px solid rgba(255, 51, 0, 0.3); }
-    .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 0 15px rgba(255, 51, 0, 0.2); }
+    .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 30px; border-radius: 12px; max-width: 500px; margin: 40px auto; box-shadow: 0 0 25px rgba(255, 51, 0, 0.4); }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
     .poetic-title { font-family: 'Georgia', serif; font-style: italic; color: #ffffff !important; text-shadow: 0 0 10px rgba(255, 51, 0, 0.5); }
     
@@ -134,82 +140,13 @@ def get_system_prompt():
         f"5. IMAGE GENERATION PROTOCOL: If asked to create/draw/generate an image, output ONLY: '||IMAGE_PROMPT|| <detailed English description>' and nothing else."
     )
 
-# SIDEBAR ARCHITECTURE (Fixed Input Form Tracking)
+# SIDEBAR ARCHITECTURE 
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
     
-    if st.session_state.app_mode == "Unauthorized":
-        st.info("✨ Terminal Locked. Initialize session context.")
-        auth_action = st.radio("Choose Matrix Entry:", ["Select Mode", "🚀 Continue As Guest", "🔐 Login / Sign In"])
-        
-        # FIX: ગમે ત્યાં Enter મારવાથી સબમિટ થાય તે માટે st.form નો ઉપયોગ કર્યો
-        if auth_action == "🚀 Continue As Guest":
-            with st.form("guest_form", clear_on_submit=False):
-                guest_name = st.text_input("Preferred Name", placeholder="Anonymous")
-                submit_guest = st.form_submit_button("Unlock Core", use_container_width=True)
-                
-                if submit_guest and guest_name:
-                    g_user = guest_name.strip()
-                    g_id = f"guest_{g_user.lower()}_{random.randint(100,999)}"
-                    st.session_state.app_mode = "Connected"
-                    st.session_state.username = g_user
-                    st.session_state.identity = g_id
-                    st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-                    st.rerun()
-                    
-        elif auth_action == "🔐 Login / Sign In":
-            with st.form("auth_form", clear_on_submit=False):
-                channel = st.radio("Verification Mode:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
-                u_name = st.text_input("Choose Username", placeholder="Your Name")
-                u_target = st.text_input("Target Email / WhatsApp Number", placeholder="user@example.com")
-                u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
-                submit_auth = st.form_submit_button("Generate Token", use_container_width=True)
-                
-                if submit_auth and u_name and u_target and u_pass:
-                    otp = str(random.randint(100000, 999999))
-                    st.session_state.generated_otp = otp
-                    st.session_state.username = u_name
-                    st.session_state.identity = u_target.strip().lower()
-                    st.session_state.saved_pass = u_pass
-                    
-                    if channel == "Email Address":
-                        if send_real_gmail_otp(st.session_state.identity, otp):
-                            st.session_state.app_mode = "OTP_Verification"
-                            st.rerun()
-                    else:
-                        clean_phone = ''.join(filter(str.isdigit, u_target))
-                        message_text = f"🔱 Aksharam AI Security Gateway \nYour verification OTP is: {otp}\n\nEngineered by TMD."
-                        encoded_message = urllib.parse.quote(message_text)
-                        st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
-                        st.session_state.app_mode = "OTP_Verification"
-                        st.rerun()
-                        
-    elif st.session_state.app_mode == "OTP_Verification":
-        st.warning("🔒 Token Verification Window")
-        with st.form("otp_form", clear_on_submit=False):
-            user_otp = st.text_input("Enter 6-Digit Code", max_chars=6)
-            submit_otp = st.form_submit_button("Verify & Launch Core", use_container_width=True)
-            
-            if submit_otp:
-                if user_otp == st.session_state.generated_otp or user_otp == MASTER_OTP:
-                    st.session_state.app_mode = "Connected"
-                    st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-                    
-                    db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
-                    if db_res and db_res.status_code == 200:
-                        for entry in db_res.json(): 
-                            st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
-                    st.rerun()
-                else:
-                    st.error("Mismatch code token.")
-                    
-        if st.button("⬅️ Abort Matrix", use_container_width=True):
-            st.session_state.app_mode = "Unauthorized"
-            st.rerun()
-            
-    elif st.session_state.app_mode == "Connected":
+    if st.session_state.app_mode == "Connected":
         st.success(f"🟢 Logged in as: {st.session_state.username}")
-        if st.session_state.identity.startswith(ADMIN_EMAIL):
+        if st.session_state.identity == generate_secure_hash(ADMIN_EMAIL):
             st.success("🔱 ADMIN CLEARANCE DETECTED")
             
         st.markdown("---")
@@ -234,14 +171,99 @@ with st.sidebar:
             st.session_state.identity = ""
             st.session_state.messages = []
             st.rerun()
+    else:
+        st.warning("🔒 Terminal Locked.")
 
-# --- MAIN DISPLAY SCREEN ENGINE ---
+# --- CENTRAL SECURE ENTER-KEY ENTRY GATEWAY ---
+if st.session_state.app_mode == "Unauthorized":
+    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #ff3300;'>🔱 Aksharam AI Gateway</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; font-style: italic;'>One step ahead with us.</p>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    auth_action = st.radio("Select Matrix Entry Mode:", ["🚀 Continue As Guest", "🔐 Login / Sign In"], horizontal=True)
+    
+    if auth_action == "🚀 Continue As Guest":
+        # Form block blocks enter-key layout destruction crashes completely
+        with st.form("main_guest_form", clear_on_submit=False):
+            guest_name = st.text_input("Enter Preferred Username", placeholder="Anonymous")
+            submit_guest = st.form_submit_button("Unlock Core Engine 🚀", use_container_width=True)
+            
+            if submit_guest and guest_name:
+                g_user = guest_name.strip()
+                # Secure Hashing Algorithm deployment to prevent ID sniffing
+                g_id = f"guest_{generate_secure_hash(g_user + str(random.randint(100,999)))}"
+                st.session_state.app_mode = "Connected"
+                st.session_state.username = g_user
+                st.session_state.identity = g_id
+                st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+                st.rerun()
+                
+    elif auth_action == "🔐 Login / Sign In":
+        with st.form("main_auth_form", clear_on_submit=False):
+            channel = st.radio("Verification Route:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
+            u_name = st.text_input("Choose Display Name", placeholder="Your Name")
+            u_target = st.text_input("Target Email / WhatsApp Phone", placeholder="user@example.com / 919876543210")
+            u_pass = st.text_input("Create Password", type="password", placeholder="••••••••")
+            submit_auth = st.form_submit_button("Generate Secure Token 🔑", use_container_width=True)
+            
+            if submit_auth and u_name and u_target and u_pass:
+                otp = str(random.randint(100000, 999999))
+                st.session_state.generated_otp = otp
+                st.session_state.username = u_name
+                # Anonymize Identity straight via crypto algorithm layers
+                st.session_state.identity = generate_secure_hash(u_target.strip().lower())
+                st.session_state.saved_pass = generate_secure_hash(u_pass)
+                
+                if channel == "Email Address":
+                    if send_real_gmail_otp(u_target.strip().lower(), otp):
+                        st.session_state.app_mode = "OTP_Verification"
+                        st.rerun()
+                else:
+                    clean_phone = ''.join(filter(str.isdigit, u_target))
+                    message_text = f"🔱 Aksharam AI Security Gateway \nYour verification OTP is: {otp}\n\nEngineered by TMD."
+                    encoded_message = urllib.parse.quote(message_text)
+                    st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
+                    st.session_state.app_mode = "OTP_Verification"
+                    st.rerun()
+                    
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
+
+elif st.session_state.app_mode == "OTP_Verification":
+    st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #ff3300;'>🔒 Token Verification</h2>", unsafe_allow_html=True)
+    
+    if st.session_state.whatsapp_url:
+        st.markdown(f'<a href="{st.session_state.whatsapp_url}" target="_blank"><div style="background-color:#25D366; color:white; text-align:center; padding:10px; border-radius:5px; font-weight:bold; margin-bottom:15px;">🟢 Open WhatsApp to Send Code</div></a>', unsafe_allow_html=True)
+        
+    with st.form("main_otp_form", clear_on_submit=False):
+        user_otp = st.text_input("Enter 6-Digit Verification Code", max_chars=6, placeholder="000000")
+        submit_otp = st.form_submit_button("Verify & Deploy Core", use_container_width=True)
+        
+        if submit_otp:
+            if user_otp == st.session_state.generated_otp or user_otp == MASTER_OTP:
+                st.session_state.app_mode = "Connected"
+                st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+                
+                db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
+                if db_res and db_res.status_code == 200:
+                    for entry in db_res.json(): 
+                        st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
+                st.rerun()
+            else:
+                st.error("Mismatch security authorization token.")
+                
+    if st.button("⬅️ Back to Entry Matrix", use_container_width=True):
+        st.session_state.app_mode = "Unauthorized"
+        st.rerun()
+        
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
+
+# --- ACTIVE CORE INTERFACE ---
 st.markdown("<h1 style='text-align: center; color: #ff3300 !important;'>🔱 AKSHARAM CORE</h1>", unsafe_allow_html=True)
-
-if st.session_state.app_mode == "Connected":
-    st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>Welcome back, {st.session_state.username}. The portal remains open, trace thy dream...</h3>", unsafe_allow_html=True)
-else:
-    st.markdown("<h3 class='poetic-title' style='text-align: center;'>The terminal is silent, waiting for the spark of your name... (Select Guest or Login inside the sidebar to awaken the core)</h3>", unsafe_allow_html=True)
+st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>Welcome back, {st.session_state.username}. The portal remains open, trace thy dream...</h3>", unsafe_allow_html=True)
 
 def render_image_block(prompt_text):
     encoded_prompt = urllib.parse.quote(prompt_text)
@@ -249,14 +271,15 @@ def render_image_block(prompt_text):
     html_layout = f'<div class="aksharam-image-container"><img src="{img_url}"><div style="text-align: center; background: #111;"><a href="{img_url}" download="Aksharam_AI.jpg" target="_blank" class="download-action-btn">📥 Download Full HD</a></div></div>'
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Clean Chat History Display
-if st.session_state.app_mode == "Connected" and not st.session_state.messages:
+# Auto Load Database Records
+if not st.session_state.messages:
     st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
     db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
     if db_res and db_res.status_code == 200:
         for entry in db_res.json(): 
             st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
 
+# Clean Chat History Display
 for msg in st.session_state.messages:
     if msg["role"] == "system": continue
     with st.chat_message(msg["role"]):
@@ -266,9 +289,9 @@ for msg in st.session_state.messages:
             st.write(msg["content"])
 
 # --- POETIC CHAT INPUT GATEWAY ---
-poetic_placeholder = "Unleash your imagination into this blank scroll, what matrix shall we weave today?..." if st.session_state.app_mode == "Connected" else "🔒 Core Engine Locked. Unlock via Sidebar Matrix Controller..."
+poetic_placeholder = "Unleash your imagination into this blank scroll, what matrix shall we weave today?..."
 
-if user_input := st.chat_input(poetic_placeholder, disabled=(st.session_state.app_mode != "Connected")):
+if user_input := st.chat_input(poetic_placeholder):
     with st.chat_message("user"):
         st.write(user_input)
     
