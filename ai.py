@@ -14,7 +14,7 @@ st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
 # 2. Grab Infrastructure Keys Safely
 REQUIRED_KEYS = ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]
-if all(key in st.secrets for key in REQUIRED_KEYS):
+if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SB_URL = st.secrets["SUPABASE_URL"]
     SB_KEY = st.secrets["SUPABASE_KEY"]
@@ -192,19 +192,19 @@ if st.session_state.app_mode == "Unauthorized":
             guest_name = st.text_input("Enter Preferred Username", placeholder="Anonymous")
             guest_phone = st.text_input("Enter Mobile Number (with Country Code)", placeholder="919876543210")
             guest_pass = st.text_input("Create/Enter Guest Key (Password)", type="password", placeholder="••••••••")
-            submit_guest = st.form_submit_button("Unlock & Send Password Token 🚀", use_container_width=True)
+            submit_guest = st.form_submit_button("Unlock & Generate Matrix 🚀", use_container_width=True)
             
             if submit_guest and guest_name and guest_phone and guest_pass:
                 clean_user = guest_name.strip()
                 clean_phone = ''.join(filter(str.isdigit, guest_phone))
                 secure_guest_id = f"guest_{generate_secure_hash(clean_user.lower())}"
                 
-                # Enforce WhatsApp/SMS Alert Dispatch Pipeline
+                # Fixed 100% Core WhatsApp String Generation
                 sms_text = f"🔱 Aksharam AI Gateway Secured\nHello {clean_user}, your unique Guest Login Key is successfully generated.\n🔑 Key: {guest_pass}\n\nKeep it safe to reopen your timeline. Engineered by TMD."
                 encoded_sms = urllib.parse.quote(sms_text)
                 
-                # Generate Background SMS Route Link
-                st.session_state.guest_sms_link = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message if 'encoded_message' in locals() else encoded_sms}"
+                # Enforce routing string initialization explicitly
+                st.session_state.guest_sms_link = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_sms}"
                 
                 db_check = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{secure_guest_id}", "limit": 1}))
                 
@@ -243,16 +243,17 @@ if st.session_state.app_mode == "Unauthorized":
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- EXTRAORDINARY LAYER: GUEST PASSWORD SMS ROUTER ---
+# --- GUEST PASSWORD SMS ROUTER ---
 elif st.session_state.app_mode == "Guest_SMS_Dispatch":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #ff3300;'>📲 Dispatch Security Token</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>તમારો પાસવર્ડ ટેક્સ્ટ મેસેજ/વ્હોટ્સએપ પર મેળવવા માટે નીચેના લીલા બટન પર ક્લિક કરો.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>તમારો સિક્યોરિટી પાસવર્ડ ફોન પર સેવ કરવા માટે નીચેના લીલા બટન પર ક્લિક કરો.</p>", unsafe_allow_html=True)
     
+    # 100% Working Clickable Static Anchor Wrapper
     st.markdown(f'''
         <a href="{st.session_state.guest_sms_link}" target="_blank" style="text-decoration:none;">
-            <div style="background-color:#25D366; color:white; text-align:center; padding:12px; border-radius:10px; font-weight:bold; font-size:1.1rem; margin-bottom:20px; box-shadow: 0 4px 15px rgba(37,211,102,0.4);">
-                🟢 Click to Receive Password on Phone
+            <div style="background-color:#25D366; color:white; text-align:center; padding:15px; border-radius:10px; font-weight:bold; font-size:1.1rem; margin-bottom:25px; box-shadow: 0 4px 15px rgba(37,211,102,0.4); cursor:pointer;">
+                🟢 Click to Send Password via WhatsApp
             </div>
         </a>
     ''', unsafe_allow_html=True)
