@@ -5,6 +5,7 @@ import random
 import smtplib
 import urllib.parse
 import asyncio
+import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -77,7 +78,7 @@ def send_real_gmail_otp(to_email, otp_code):
         st.error(f"Gmail Routing Link Error: {e}")
         return False
 
-# Inject 3D Visual Styling Environment
+# Inject 3D Visual Styling & JavaScript for Browser Persistence
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -92,17 +93,12 @@ vanta_3d_html = """
     .stApp { background: transparent !important; }
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; border-right: 2px solid rgba(255, 51, 0, 0.3); }
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 0 15px rgba(255, 51, 0, 0.2); }
-    .quote-box { font-style: italic; color: #ff3300; text-align: center; margin-bottom: 20px; font-size: 1.1rem; font-weight: bold; }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
     .poetic-title { font-family: 'Georgia', serif; font-style: italic; color: #ffffff !important; text-shadow: 0 0 10px rgba(255, 51, 0, 0.5); }
 
-    .chat-row-container {
-        background-color: rgba(15, 15, 15, 0.9) !important; 
-        border-radius: 12px; 
-        border-left: 5px solid #ff3300 !important;
-        padding: 18px;
-        margin-bottom: 15px;
-    }
+    .aksharam-image-container { max-width: 550px !important; margin: 15px 0px; border-radius: 14px; border: 2px solid #ff3300; overflow: hidden; box-shadow: 0 8px 24px rgba(255,51,0,0.25); background: #0a0a0a; }
+    .aksharam-image-container img { width: 100% !important; height: auto !important; object-fit: contain !important; }
+    .download-action-btn { display: inline-block; background-color: #ff3300; color: white !important; text-decoration: none !important; padding: 10px 20px; font-weight: bold; border-radius: 8px; margin: 12px; font-size: 0.95rem; text-align: center; }
 </style>
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
@@ -115,41 +111,93 @@ if "saved_pass" not in st.session_state: st.session_state.saved_pass = ""
 if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
 if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
 if "messages" not in st.session_state: st.session_state.messages = []
+if "local_storage_checked" not in st.session_state: st.session_state.local_storage_checked = False
 
-# --- EXTRAORDINARY MAIN ACTIVE SYSTEM CORE ---
-SYSTEM_PROMPT = (
-    f"Your name is Aksharam, a world-class premium AI assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
-    f"Current User: {st.session_state.username if st.session_state.username else 'Seeker'}.\n\n"
-    f"CRITICAL CORE EXECUTION RULES:\n"
-    f"1. TIME AWARENESS: The current year is strictly 2026.\n"
-    f"2. ZERO HALLUCINATION POLICY: Never provide fake information or unverified data.\n"
-    f"3. FLUID MULTI-LINGUAL MATRIX: Match user's language instantly with immaculate fluency.\n"
-    f"4. HIGHLY PROFESSIONAL TONALITY: Sophisticated, clean structure, clear layouts, using bullet points or bold text.\n"
-    f"5. IMAGE GENERATION PROTOCOL: If asked to create/draw/generate an image, output ONLY: '||IMAGE_PROMPT|| <detailed English description>' and nothing else."
-)
+# --- SYSTEM PROMPT TEMPLATE ---
+def get_system_prompt():
+    return (
+        f"Your name is Aksharam, a world-class premium AI assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
+        f"Current User: {st.session_state.username if st.session_state.username else 'Seeker'}.\n\n"
+        f"CRITICAL CORE EXECUTION RULES:\n"
+        f"1. TIME AWARENESS: The current year is strictly 2026.\n"
+        f"2. ZERO HALLUCINATION POLICY: Never provide fake information or unverified data.\n"
+        f"3. FLUID MULTI-LINGUAL MATRIX: Match user's language instantly with immaculate fluency (Gujarati, Hindi, English).\n"
+        f"4. HIGHLY PROFESSIONAL TONALITY: Sophisticated, clean structure, clear layouts.\n"
+        f"5. IMAGE GENERATION PROTOCOL: If asked to create/draw/generate an image, output ONLY: '||IMAGE_PROMPT|| <detailed English description>' and nothing else."
+    )
 
-# SIDEBAR ARCHITECTURE (Direct Option Controls)
+# --- EXTRAORDINARY BRIDGING LAYER: BROWSER SESSION PERSISTENCE ---
+# HTML/JS component to read and write LocalStorage to prevent device exit wipeouts
+if not st.session_state.local_storage_checked:
+    # A tiny invisible JS bridge that communicates with Streamlit's runtime components
+    js_bridge = """
+    <script>
+        const appMode = localStorage.getItem("aksharam_app_mode");
+        const username = localStorage.getItem("aksharam_username");
+        const identity = localStorage.getItem("aksharam_identity");
+        
+        if (appMode && username && identity) {
+            const url = window.location.href;
+            window.parent.postMessage({
+                type: "streamlit:set_state",
+                data: { aksharam_session: { app_mode: appMode, username: username, identity: identity } }
+            }, "*");
+        }
+    </script>
+    """
+    # Create query parameters check as alternative fluid sync state
+    if "aksharam_session" in st.session_state or "sync_identity" in st.query_params:
+        pass
+    else:
+        # Check query params for persistent reloading structure
+        q_identity = st.query_params.get("session_id", None)
+        q_username = st.query_params.get("session_user", None)
+        q_mode = st.query_params.get("session_mode", None)
+        if q_identity and q_username and q_mode:
+            st.session_state.app_mode = q_mode
+            st.session_state.username = q_username
+            st.session_state.identity = q_identity
+            st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+            
+            # Fetch active cloud log database history instantly
+            if not q_identity.startswith("guest_"):
+                db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{q_identity}", "order": "id.asc"}))
+                if db_res and db_res.status_code == 200:
+                    for entry in db_res.json(): 
+                        st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
+        st.session_state.local_storage_checked = True
+
+# HELPER TO SAVE STATE ACROSS SYSTEM REBOOTS/CLOSURES
+def commit_session_state(mode, username, identity):
+    st.session_state.app_mode = mode
+    st.session_state.username = username
+    st.session_state.identity = identity
+    st.query_params["session_id"] = identity
+    st.query_params["session_user"] = username
+    st.query_params["session_mode"] = mode
+
+# SIDEBAR ARCHITECTURE
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
     
     if st.session_state.app_mode == "Unauthorized":
-        st.info("✨ Terminal Locked. Initialize via gateway options below.")
+        st.info("✨ Terminal Locked. Initialize session context.")
         auth_action = st.radio("Choose Matrix Entry:", ["Select Mode", "🚀 Continue As Guest", "🔐 Login / Sign In"])
         
         if auth_action == "🚀 Continue As Guest":
             guest_name = st.text_input("Preferred Name", placeholder="Anonymous")
             if st.button("Unlock Core", use_container_width=True):
                 if guest_name:
-                    st.session_state.username = guest_name.strip()
-                    st.session_state.identity = f"guest_{guest_name.strip().lower()}"
-                    st.session_state.app_mode = "Connected"
-                    st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+                    g_user = guest_name.strip()
+                    g_id = f"guest_{g_user.lower()}_{random.randint(100,999)}"
+                    commit_session_state("Connected", g_user, g_id)
+                    st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
                     st.rerun()
                     
         elif auth_action == "🔐 Login / Sign In":
             channel = st.radio("Verification Mode:", ["Email Address", "Free WhatsApp Gateway"], horizontal=True)
             u_name = st.text_input("Choose Username", placeholder="Your Name")
-            u_target = st.text_input("Target Email / WhatsApp Number", placeholder="user@example.com / 919876543210")
+            u_target = st.text_input("Target Email / WhatsApp Number", placeholder="user@example.com")
             u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
             
             if st.button("Generate Token", use_container_width=True):
@@ -180,9 +228,9 @@ with st.sidebar:
         user_otp = st.text_input("Enter 6-Digit Code", max_chars=6)
         if st.button("Verify & Launch Core", use_container_width=True):
             if user_otp == st.session_state.generated_otp or user_otp == MASTER_OTP:
-                st.session_state.app_mode = "Connected"
-                st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-                # Async History fetch
+                commit_session_state("Connected", st.session_state.username, st.session_state.identity)
+                st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+                
                 db_res = run_async(supabase_request_async("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"}))
                 if db_res and db_res.status_code == 200:
                     for entry in db_res.json(): 
@@ -195,18 +243,20 @@ with st.sidebar:
             st.rerun()
             
     elif st.session_state.app_mode == "Connected":
-        st.success(f"🟢 ACTIVE MATRIX: {st.session_state.username}")
+        st.success(f"🟢 Already logged in as: {st.session_state.username}")
+        st.caption(f"🆔 Identity Trace: `{st.session_state.identity}`")
         if st.session_state.identity.startswith(ADMIN_EMAIL):
             st.success("🔱 ADMIN CLEARANCE DETECTED")
         st.markdown("---")
         if st.button("➕ New Chat Matrix", use_container_width=True):
-            st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
             st.rerun()
         if st.button("🚪 Disconnect Matrix Engine", use_container_width=True):
             st.session_state.app_mode = "Unauthorized"
             st.session_state.username = ""
             st.session_state.identity = ""
             st.session_state.messages = []
+            st.query_params.clear()
             st.rerun()
 
 # --- MAIN DISPLAY SCREEN ENGINE ---
@@ -214,7 +264,7 @@ st.markdown("<h1 style='text-align: center; color: #ff3300 !important;'>🔱 AKS
 
 # Poetic Welcome Titles
 if st.session_state.app_mode == "Connected":
-    st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>Greetings, {st.session_state.username}. Speak thy mind, trace thy dream...</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 class='poetic-title' style='text-align: center;'>Welcome back, {st.session_state.username}. The portal remains open, trace thy dream...</h3>", unsafe_allow_html=True)
 else:
     st.markdown("<h3 class='poetic-title' style='text-align: center;'>The terminal is silent, waiting for the spark of your name... (Select Guest or Login inside the sidebar to awaken the core)</h3>", unsafe_allow_html=True)
 
@@ -240,6 +290,9 @@ if user_input := st.chat_input(poetic_placeholder, disabled=(st.session_state.ap
     with st.chat_message("user"):
         st.write(user_input)
     
+    if not st.session_state.messages:
+        st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+        
     st.session_state.messages.append({"role": "user", "content": user_input})
     asyncio.run(supabase_request_async("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input}))
 
