@@ -160,8 +160,10 @@ elif st.session_state.app_mode == "Guest_Setup":
     guest_name = st.text_input("Enter Your Preferred Name", placeholder="Anonymous")
     if st.button("Initialize Session", use_container_width=True):
         if guest_name:
+            clean_name = guest_name.strip().replace(" ", "_").lower()
             st.session_state.username = guest_name
-            st.session_state.identity = f"guest_{random.randint(1000,9999)}"
+            # Giving them a persistent custom guest string so if they type the same name, it retrieves their data
+            st.session_state.identity = f"guest_{clean_name}"
             st.session_state.app_mode = "Connected"
             st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
@@ -263,26 +265,43 @@ SYSTEM_PROMPT = (
     f"You must translate their request into a highly detailed, cinematic, high-resolution descriptive art prompt in English so the generator understands it perfectly."
 )
 
+# Fetch Previous Data Globally to secure instant message recall across separate devices
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     db_res = supabase_request("chat_logs", "GET", params={"email": f"eq.{st.session_state.identity}", "order": "id.asc"})
     if db_res.status_code == 200:
-        for entry in db_res.json(): st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
+        for entry in db_res.json(): 
+            st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
 
 current_identity = st.session_state.identity.strip().lower()
 
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
-    # Poetic transformation applied directly to the universe core setup
     st.markdown(f"*✨ Your imagination rules this realm, {st.session_state.username}...*")
     if current_identity == ADMIN_EMAIL:
         st.success("🟢 ADMIN CLEARANCE GRANTED")
     else:
-        st.warning("🟡 GUEST CLEARANCE ONLY")
+        st.warning("🟡 ACCESS CLEARED")
+    
     st.markdown("---")
-    if st.button("🔒 Secure Session Exit", use_container_width=True):
+    st.markdown("📂 **Saved Work Matrix**")
+    
+    # Building a dynamic "Folder" listing structure based on the very first user message
+    user_queries = [m["content"] for m in st.session_state.messages if m["role"] == "user"]
+    if user_queries:
+        first_topic = user_queries[0]
+        short_title = first_topic[:22] + "..." if len(first_topic) > 22 else first_topic
+        st.markdown(f"📁 **`{short_title}`**")
+        st.caption(f"📄 save_chat_log.dat ({len(st.session_state.messages) - 1} logs recovered)")
+    else:
+        st.caption("📁 *No directories established yet.*")
+        
+    st.markdown("---")
+    # Clean, minimalist, and highly effective exit button variant
+    if st.button("🚪 Disconnect Core", use_container_width=True):
         st.session_state.app_mode = "Gateway"
-        st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        if "messages" in st.session_state:
+            del st.session_state.messages
         st.rerun()
 
 st.title("🔱 Aksharam Core Engine")
@@ -349,5 +368,9 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
                 response_placeholder.markdown(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
+            
+            # Force UI update to ensure folders adapt immediately on the very first message
+            if len(user_queries) == 0:
+                st.rerun()
                 
         except Exception as e: st.error(f"Cloud Routing Error: {e}")
