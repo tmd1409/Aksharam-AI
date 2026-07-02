@@ -4,6 +4,7 @@ import httpx
 import random
 import smtplib
 import urllib.parse
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -215,16 +216,14 @@ elif st.session_state.app_mode == "OTP_Screen":
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- MAIN ACTIVE CHAT INTERFACE ---
-# Upgraded prompt with strict 2026 temporal awareness and flawless native-level Gujarati rules
+# --- MAIN ACTIVE SYSTEM CORE ---
 SYSTEM_PROMPT = (
     f"Your name is Aksharam, an elite super-assistant engineered by Trushal Yogeshbhai Maniya (TMD). "
     f"Assisting user: {st.session_state.username}. "
     f"CRITICAL SYSTEM SETTINGS:\n"
-    f"1. The current year is 2026. You must evaluate all timelines, technologies, facts, and events up to the year 2026.\n"
-    f"2. You possess perfect, absolute, native-level fluency in Gujarati, Hindi, English, and other regional languages. "
-    f"When the user interacts with you in Gujarati (ગુજરાતી), you must respond in highly sophisticated, grammatically flawless, natural Gujarati. "
-    f"Do not use clunky computer translations or mix incorrect Hindi tokens into Gujarati responses. Keep it clear, eloquent, and culturally accurate."
+    f"1. The current year is 2026. Evaluate all timelines, facts, and events up to the year 2026.\n"
+    f"2. You possess perfect, native-level language generation capabilities in Gujarati, Hindi, and English. "
+    f"Provide flawless, sophisticated, elegant, and contextually absolute translations and text formulations."
 )
 
 if "messages" not in st.session_state:
@@ -235,6 +234,7 @@ if "messages" not in st.session_state:
 
 current_identity = st.session_state.identity.strip().lower()
 
+# --- SIDEBAR INTERFACE: ADVANCED LINGUISTIC DASHBOARD ---
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
     st.markdown(f"**Operator:** `{st.session_state.username}`")
@@ -242,34 +242,100 @@ with st.sidebar:
         st.success("🟢 ADMIN CLEARANCE GRANTED")
     else:
         st.warning("🟡 GUEST CLEARANCE ONLY")
+    
+    st.markdown("---")
+    
+    # Mode Switcher: Let the user jump between standard chatbot or Advanced Modules
+    app_feature = st.radio("Select Engine Layer:", ["💬 AI Conversationalist", "🔬 Advanced Linguistics Engine"])
+    
+    if app_feature == "🔬 Advanced Linguistics Engine":
+        st.markdown("### ⚡ Real-Time Processing Suite")
+        ling_mode = st.selectbox("Task Mode:", ["Contextual Translation", "Grammar & Tone Optimizer", "Smart Text Analyzer"])
+        
+        target_lang = ""
+        target_tone = ""
+        
+        if ling_mode == "Contextual Translation":
+            target_lang = st.selectbox("Translate to Language:", ["Gujarati (ગુજરાતી)", "Hindi (हिन्दी)", "English (US/UK)"])
+        elif ling_mode == "Grammar & Tone Optimizer":
+            target_tone = st.selectbox("Adjust Target Tone:", ["Highly Professional", "Casual & Friendly", "Academic / Analytical", "Diplomatic / Polite"])
+            
+        src_text = st.text_area("Input Text Matrix:", placeholder="Type or paste your text here...")
+        
+        # Real-time analytics output box inside sidebar
+        if src_text:
+            words = len(src_text.split())
+            chars = len(src_text)
+            read_time = max(1, round(words / 200))
+            st.markdown(f"📊 **Metrics:** Words: `{words}` | Characters: `{chars}` | Read Time: ~`{read_time} min`")
+            
+        if st.button("🔥 Execute Linguistic Stream", use_container_width=True):
+            if not src_text:
+                st.error("Linguistic input buffer is empty.")
+            else:
+                if ling_mode == "Contextual Translation":
+                    exec_prompt = f"System Instruction: Translate the following text completely and with contextually perfect syntax into {target_lang}. Maintain appropriate cultural nuances. Text:\n'{src_text}'"
+                elif ling_mode == "Grammar & Tone Optimizer":
+                    exec_prompt = f"System Instruction: Analyze and rewrite the following text. Correct all grammatical errors, smooth out syntax issues, and strictly convert the presentation tone to be {target_tone}. Text:\n'{src_text}'"
+                else:
+                    exec_prompt = f"System Instruction: Perform an extreme linguistic and structural analysis of this text. Break down its grammatical health, identify keywords, evaluate readability, and summarize its core concepts clearly. Text:\n'{src_text}'"
+                
+                st.session_state.messages.append({"role": "user", "content": exec_prompt})
+                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": exec_prompt})
+                st.rerun()
+
     st.markdown("---")
     if st.button("🔒 Secure Session Exit", use_container_width=True):
         st.session_state.app_mode = "Gateway"
         st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         st.rerun()
 
-st.title("🔱 Aksharam Core Engine")
-st.markdown(f"### Hi {st.session_state.username}, how can Aksharam help you today?")
+# --- ACTIVE WINDOW RENDERER ---
+st.title("🔱 Aksharam Engine Matrix")
 
+if app_feature == "🔬 Advanced Linguistics Engine":
+    st.markdown("### 🔬 Advanced Language Engine Active")
+    st.info("Configure your translation, tone modification, or analyzer tool in the left sidebar dashboard and hit 'Execute' to generate advanced responses.")
+else:
+    st.markdown(f"### Hi {st.session_state.username}, how can Aksharam assist you today?")
+
+# Render historical messages
 for message in st.session_state.messages:
     if message["role"] != "system":
-        with st.chat_message(message["role"]): st.markdown(message["content"])
+        with st.chat_message(message["role"]): 
+            # Prettify the visual structure if it's a structural command prompt
+            if "System Instruction:" in message["content"]:
+                st.markdown(f"⚙️ **[Executed System Task Command]**")
+                st.caption(message["content"])
+            else:
+                st.markdown(message["content"])
 
-# --- UNIVERSAL CHAT INPUT ---
+# --- CORE CHAT PROCESSING PIPELINE ---
+should_process = False
+user_input_text = ""
+
+# Handle regular conversational text input
 if user_input := st.chat_input("Query Aksharam Framework..."):
-    with st.chat_message("user"): st.markdown(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
+    user_input_text = user_input
+    should_process = True
+    st.session_state.messages.append({"role": "user", "content": user_input_text})
+    supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input_text})
+# Catch the background trigger when someone executes a sidebar analysis task
+elif len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "user" and "System Instruction:" in st.session_state.messages[-1]["content"]:
+    should_process = True
 
+if should_process:
+    if user_input_text:
+        with st.chat_message("user"): st.markdown(user_input_text)
+        
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         full_response = ""
         try:
-            # UPGRADED TO THE 70-BILLION MULTILINGUAL MASTER ENGINE (llama-3.3-70b-versatile)
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile", 
                 messages=st.session_state.messages, 
-                temperature=0.3, 
+                temperature=0.2, 
                 stream=True
             )
             for chunk in completion:
@@ -279,4 +345,5 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
             response_placeholder.markdown(full_response)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
             supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
-        except Exception as e: st.error(f"Cloud Routing Error: {e}")
+        except Exception as e: 
+            st.error(f"Cloud Routing Error: {e}")
