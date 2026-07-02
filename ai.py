@@ -65,7 +65,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
         if method == "POST": return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# Inject 3D Visual Styling & Custom Copy Utility Action Rules
+# Inject 3D Visual Styling & New Copy Action Rules
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -78,12 +78,10 @@ vanta_3d_html = """
 function copyTextToClipboard(textId, buttonEl) {
     var textContent = document.getElementById(textId).innerText;
     navigator.clipboard.writeText(textContent).then(function() {
-        buttonEl.innerHTML = "📋 Copied!";
-        buttonEl.style.color = "#25D366";
+        buttonEl.innerHTML = "✅";
         setTimeout(function() {
-            buttonEl.innerHTML = "🔗 Copy Answer";
-            buttonEl.style.color = "#ff3300";
-        }, 1800);
+            buttonEl.innerHTML = "📋";
+        }, 1500);
     });
 }
 </script>
@@ -100,10 +98,39 @@ function copyTextToClipboard(textId, buttonEl) {
 
     .stApp { background: transparent !important; }
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; border-right: 2px solid rgba(255, 51, 0, 0.3); }
-    [data-testid="stChatMessage"] { background-color: rgba(10, 10, 10, 0.85) !important; border-radius: 16px; border: 2.5px solid #ff3300 !important; }
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 30px; border-radius: 15px; max-width: 500px; margin: 40px auto; box-shadow: 0 0 30px rgba(255, 51, 0, 0.3); }
     .quote-box { font-style: italic; color: #ff3300; text-align: center; margin-bottom: 20px; font-size: 1.1rem; font-weight: bold; }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
+
+    /* Modern clean container layout for tracking questions and answers */
+    .chat-row-container {
+        background-color: rgba(10, 10, 10, 0.85) !important; 
+        border-radius: 16px; 
+        border: 2px solid #ff3300 !important;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .label-heading-user {
+        color: #ff3300 !important;
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+    }
+    .label-heading-ai {
+        color: #ffffff !important;
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-top: 15px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .copy-symbol-btn {
+        cursor: pointer;
+        font-size: 1.1rem;
+        user-select: none;
+    }
 
     /* Custom layout rules for crisp image container output rendering */
     .aksharam-image-container {
@@ -334,77 +361,66 @@ def render_image_block(prompt_text):
     '''
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Sequential chat rendering flow
-for idx, message in enumerate(st.session_state.messages):
-    if message["role"] != "system":
-        with st.chat_message(message["role"]):
-            if "||IMAGE_PROMPT||" in message["content"]:
-                clean_prompt = message["content"].replace("||IMAGE_PROMPT||", "").strip()
-                render_image_block(clean_prompt)
-            else:
-                if message["role"] == "user":
-                    st.markdown(message["content"])
-                elif message["role"] == "assistant":
-                    # Uses standard markdown to maintain the font style perfectly
-                    st.markdown(f'<div id="msg_{idx}">{message["content"]}</div>', unsafe_allow_html=True)
-                    
-                    # Renders an elegant custom text link that accurately copies the content on a single click
-                    copy_layout = f'''
-                    <div style="text-align: right; margin-top: -5px; margin-bottom: 10px;">
-                        <span style="color: #ff3300; cursor: pointer; font-size: 0.85rem; font-weight: bold; text-decoration: underline;" 
-                              onclick="parent.copyTextToClipboard('msg_{idx}', this)">🔗 Copy Answer</span>
-                    </div>
-                    '''
-                    st.components.v1.html(copy_layout, height=25)
+# Process logic and compile pairs for clean sequential numbering block outputs
+chat_history = [m for m in st.session_state.messages if m["role"] != "system"]
+paired_turns = []
+current_turn = {"user": None, "assistant": None}
+
+for msg in chat_history:
+    if msg["role"] == "user":
+        if current_turn["user"] is not None:
+            paired_turns.append(current_turn)
+            current_turn = {"user": None, "assistant": None}
+        current_turn["user"] = msg["content"]
+    elif msg["role"] == "assistant":
+        current_turn["assistant"] = msg["content"]
+        paired_turns.append(current_turn)
+        current_turn = {"user": None, "assistant": None}
+
+if current_turn["user"] is not None:
+    paired_turns.append(current_turn)
+
+# Structured view rendering engine
+for index, turn in enumerate(paired_turns, start=1):
+    st.markdown(f'<div class="chat-row-container">', unsafe_allow_html=True)
+    
+    # 1. Output Question Row
+    st.markdown(f'<div class="label-heading-user">Question {index}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div>{turn["user"]}</div><br>', unsafe_allow_html=True)
+    
+    # 2. Output Answer Row
+    if turn["assistant"] is not None:
+        if "||IMAGE_PROMPT||" in turn["assistant"]:
+            clean_prompt = turn["assistant"].replace("||IMAGE_PROMPT||", "").strip()
+            render_image_block(clean_prompt)
+        else:
+            st.markdown(f'''
+                <div class="label-heading-ai">
+                    <span>Answer {index}</span>
+                    <span class="copy-symbol-btn" onclick="parent.copyTextToClipboard('ans_text_{index}', this)">📋</span>
+                </div>
+            ''', unsafe_allow_html=True)
+            st.markdown(f'<div id="ans_text_{index}">{turn["assistant"]}</div>', unsafe_allow_html=True)
+            
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # --- UNIVERSAL CHAT INPUT PIPELINE ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
-    with st.chat_message("user"): 
-        st.markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
     supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
 
-    with st.chat_message("assistant"):
-        response_placeholder = st.empty()
-        full_response = ""
-        try:
-            completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile", 
-                messages=st.session_state.messages, 
-                temperature=0.3, 
-                stream=True
-            )
-            for chunk in completion:
-                if chunk.choices[0].delta.content:
-                    full_response += chunk.choices[0].delta.content
-                    response_placeholder.markdown(full_response + "▌")
-            
-            if "||IMAGE_PROMPT||" in full_response:
-                clean_prompt = full_response.replace("||IMAGE_PROMPT||", "").strip()
-                response_placeholder.empty()
-                render_image_block(clean_prompt)
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile", 
+            messages=st.session_state.messages, 
+            temperature=0.3, 
+            stream=False
+        )
+        full_response = completion.choices[0].message.content
+        
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
+        supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
+        st.rerun()
                 
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
-            else:
-                response_placeholder.empty()
-                
-                # Render clean layout for incoming data pipelines
-                new_idx = len(st.session_state.messages)
-                st.markdown(f'<div id="msg_{new_idx}">{full_response}</div>', unsafe_allow_html=True)
-                
-                copy_layout = f'''
-                <div style="text-align: right; margin-top: -5px; margin-bottom: 10px;">
-                    <span style="color: #ff3300; cursor: pointer; font-size: 0.85rem; font-weight: bold; text-decoration: underline;" 
-                          onclick="parent.copyTextToClipboard('msg_{new_idx}', this)">🔗 Copy Answer</span>
-                </div>
-                '''
-                st.components.v1.html(copy_layout, height=25)
-                
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
-            
-            if len(user_queries) == 0:
-                st.rerun()
-                
-        except Exception as e: st.error(f"Cloud Routing Error: {e}")
+    except Exception as e: 
+        st.error(f"Cloud Routing Error: {e}")
