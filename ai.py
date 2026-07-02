@@ -17,7 +17,7 @@ if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_K
     SB_KEY = st.secrets["SUPABASE_KEY"]
     GMAIL_SENDER = st.secrets["GMAIL_SENDER"]
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
-    ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"]
+    ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"].strip().lower()
 else:
     st.error("Missing architecture keys or ADMIN_EMAIL inside Streamlit Secrets panel.")
     st.stop()
@@ -65,7 +65,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
         if method == "POST": return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# Inject 3D Visual Styling Core & HIDE STREAMLIT MENUS
+# Inject 3D Visual Styling & STRIP OUT ALL STREAMLIT TOOLBARS/BUTTONS FOR CLEAN LOOK
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -74,13 +74,17 @@ vanta_3d_html = """
     VANTA.NET({el: "#vanta-bg", mouseControls: true, touchControls: true, minHeight: 200.00, minWidth: 200.00, scale: 1.00, color: 0xff3300, backgroundColor: 0x000000})
 </script>
 <style>
-    /* HIDE DEFAULT STREAMLIT UI ELEMENTS */
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    [data-testid="stToolbar"] {visibility: hidden !important;}
+    /* HIDE THE STREAMLIT DEPLOY BUTTON, TOOLBAR, STAR ICON, AND HAMBURGER MENU COMPLETELY */
+    #MainMenu {visibility: hidden; display: none !important;}
+    header {visibility: hidden; display: none !important;}
+    footer {visibility: hidden; display: none !important;}
+    [data-testid="stAppDeployButton"] {display: none !important;}
+    [data-testid="stToolbar"] {display: none !important;}
+    [data-testid="stDecoration"] {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    .stDeployButton {display: none !important;}
 
-    /* CUSTOM AKSHARAM STYLING */
+    /* CUSTOM FRAMEWORK STYLING */
     .stApp { background: transparent !important; }
     [data-testid="stSidebar"] { background-color: rgba(0, 0, 0, 0.95) !important; border-right: 2px solid rgba(255, 51, 0, 0.3); }
     [data-testid="stChatMessage"] { background-color: rgba(10, 10, 10, 0.85) !important; border-radius: 16px; border: 2.5px solid #ff3300 !important; }
@@ -152,7 +156,7 @@ elif st.session_state.app_mode == "Auth_Setup":
             otp = str(random.randint(100000, 999999))
             st.session_state.generated_otp = otp
             st.session_state.username = u_name
-            st.session_state.identity = u_target
+            st.session_state.identity = u_target.strip().lower()
             st.session_state.saved_pass = u_pass
             
             if channel == "Email Address":
@@ -221,10 +225,12 @@ if "messages" not in st.session_state:
     if db_res.status_code == 200:
         for entry in db_res.json(): st.session_state.messages.append({"role": entry["role"], "content": entry["content"]})
 
+current_identity = st.session_state.identity.strip().lower()
+
 with st.sidebar:
     st.markdown(f"## 🔱 Aksharam AI Core")
     st.markdown(f"**Operator:** `{st.session_state.username}`")
-    if st.session_state.identity == ADMIN_EMAIL:
+    if current_identity == ADMIN_EMAIL:
         st.success("🟢 ADMIN CLEARANCE GRANTED")
     else:
         st.warning("🟡 GUEST CLEARANCE ONLY")
@@ -241,26 +247,23 @@ for message in st.session_state.messages:
     if message["role"] != "system":
         with st.chat_message(message["role"]): st.markdown(message["content"])
 
-# --- ADMIN WRITE LOCK LOGIC ---
-if st.session_state.identity == ADMIN_EMAIL:
-    if user_input := st.chat_input("Query Aksharam Framework..."):
-        with st.chat_message("user"): st.markdown(user_input)
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
+# --- UNIVERSAL OPEN CHAT INPUT ---
+# Removed the admin check wrapper so any authenticated or guest status user can query the engine
+if user_input := st.chat_input("Query Aksharam Framework..."):
+    with st.chat_message("user"): st.markdown(user_input)
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "user", "content": user_input})
 
-        with st.chat_message("assistant"):
-            response_placeholder = st.empty()
-            full_response = ""
-            try:
-                completion = client.chat.completions.create(model="llama-3.1-8b-instant", messages=st.session_state.messages, temperature=0.1, stream=True)
-                for chunk in completion:
-                    if chunk.choices[0].delta.content:
-                        full_response += chunk.choices[0].delta.content
-                        response_placeholder.markdown(full_response + "▌")
-                response_placeholder.markdown(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
-            except Exception as e: st.error(f"Cloud Routing Error: {e}")
-else:
-    # If it is anyone else, they don't get the chat input box!
-    st.info("🔒 System is locked in Read-Only Mode. Only the Admin can send queries to Aksharam.")
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        full_response = ""
+        try:
+            completion = client.chat.completions.create(model="llama-3.1-8b-instant", messages=st.session_state.messages, temperature=0.1, stream=True)
+            for chunk in completion:
+                if chunk.choices[0].delta.content:
+                    full_response += chunk.choices[0].delta.content
+                    response_placeholder.markdown(full_response + "▌")
+            response_placeholder.markdown(full_response)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
+        except Exception as e: st.error(f"Cloud Routing Error: {e}")
