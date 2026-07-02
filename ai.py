@@ -65,7 +65,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
         if method == "POST": return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# Inject 3D Visual Styling & UI Adjustments
+# Inject 3D Visual Styling & Font Matching Rules
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -89,6 +89,21 @@ vanta_3d_html = """
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 30px; border-radius: 15px; max-width: 500px; margin: 40px auto; box-shadow: 0 0 30px rgba(255, 51, 0, 0.3); }
     .quote-box { font-style: italic; color: #ff3300; text-align: center; margin-bottom: 20px; font-size: 1.1rem; font-weight: bold; }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
+
+    /* Forces the code snippet block to match standard chat font exactly */
+    [data-testid="stCodeBlock"] code {
+        font-family: inherit !important;
+        font-size: 1rem !important;
+        background: transparent !important;
+        color: #ffffff !important;
+        white-space: pre-wrap !important;
+    }
+    [data-testid="stCodeBlock"] {
+        background-color: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
 
     /* Custom layout rules for crisp image container output rendering */
     .aksharam-image-container {
@@ -319,7 +334,7 @@ def render_image_block(prompt_text):
     '''
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Normal sequential flow: displays Question first, then Answer directly below it
+# Sequential chat rendering flow
 for idx, message in enumerate(st.session_state.messages):
     if message["role"] != "system":
         with st.chat_message(message["role"]):
@@ -330,10 +345,8 @@ for idx, message in enumerate(st.session_state.messages):
                 if message["role"] == "user":
                     st.markdown(message["content"])
                 elif message["role"] == "assistant":
-                    # Display normal Markdown text matching the user's question font style perfectly
-                    st.markdown(message["content"])
-                    # Standard elegant copy snippet matching standard styling
-                    st.copy_to_clipboard(message["content"])
+                    # Uses st.code to get the built-in copy icon, but CSS overrides the font to match st.markdown exactly
+                    st.code(message["content"])
 
 # --- UNIVERSAL CHAT INPUT PIPELINE ---
 if user_input := st.chat_input("Query Aksharam Framework..."):
@@ -365,8 +378,8 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
             else:
-                response_placeholder.markdown(full_response)
-                st.copy_to_clipboard(full_response)
+                response_placeholder.empty()
+                st.code(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
             
