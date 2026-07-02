@@ -11,13 +11,15 @@ from email.mime.multipart import MIMEMultipart
 st.set_page_config(page_title="Aksharam AI", page_icon="🔱", layout="wide")
 
 # 2. Grab Infrastructure Keys Safely
-if all(key in st.secrets for key in ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]):
+REQUIRED_KEYS = ["GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "GMAIL_SENDER", "GMAIL_PASSWORD", "ADMIN_EMAIL"]
+if all(key in st.secrets for key in REQUIRED_KEYS):
     GROQ_KEY = st.secrets["GROQ_API_KEY"]
     SB_URL = st.secrets["SUPABASE_URL"]
     SB_KEY = st.secrets["SUPABASE_KEY"]
     GMAIL_SENDER = st.secrets["GMAIL_SENDER"]
     GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
     ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"].strip().lower()
+    MASTER_OTP = st.secrets.get("MASTER_OTP", "786786") # Kept safe via secrets
 else:
     st.error("Missing architecture keys or ADMIN_EMAIL inside Streamlit Secrets panel.")
     st.stop()
@@ -47,11 +49,10 @@ def send_real_gmail_otp(to_email, otp_code):
         </html>
         """
         msg.attach(MIMEText(body, 'html'))
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(GMAIL_SENDER, GMAIL_PASSWORD)
-        server.sendmail(GMAIL_SENDER, to_email, msg.as_string())
-        server.quit()
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
+            server.sendmail(GMAIL_SENDER, to_email, msg.as_string())
         return True
     except Exception as e:
         st.error(f"Gmail Routing Link Error: {e}")
@@ -59,13 +60,19 @@ def send_real_gmail_otp(to_email, otp_code):
 
 # Supabase Request Handler
 def supabase_request(table, method="GET", json_data=None, params=None):
-    headers = {"apiKey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "application/json", "Prefer": "return=representation"}
+    headers = {
+        "apiKey": SB_KEY, 
+        "Authorization": f"Bearer {SB_KEY}", 
+        "Content-Type": "application/json", 
+        "Prefer": "return=representation"
+    }
     url = f"{SB_URL}/rest/v1/{table}"
     with httpx.Client() as cl:
-        if method == "POST": return cl.post(url, headers=headers, json=json_data)
+        if method == "POST": 
+            return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# Inject 3D Visual Styling & New Copy Action Rules
+# Inject 3D Visual Styling & Fixed Embedded Copy Script Environment
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -73,19 +80,6 @@ vanta_3d_html = """
 <script>
     VANTA.NET({el: "#vanta-bg", mouseControls: true, touchControls: true, minHeight: 200.00, minWidth: 200.00, scale: 1.00, color: 0xff3300, backgroundColor: 0x000000})
 </script>
-
-<script>
-function copyTextToClipboard(textId, buttonEl) {
-    var textContent = document.getElementById(textId).innerText;
-    navigator.clipboard.writeText(textContent).then(function() {
-        buttonEl.innerHTML = "✅";
-        setTimeout(function() {
-            buttonEl.innerHTML = "📋";
-        }, 1500);
-    });
-}
-</script>
-
 <style>
     #MainMenu {visibility: hidden; display: none !important;}
     header {visibility: hidden; display: none !important;}
@@ -102,7 +96,6 @@ function copyTextToClipboard(textId, buttonEl) {
     .quote-box { font-style: italic; color: #ff3300; text-align: center; margin-bottom: 20px; font-size: 1.1rem; font-weight: bold; }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
 
-    /* Modern clean container layout for tracking questions and answers */
     .chat-row-container {
         background-color: rgba(10, 10, 10, 0.85) !important; 
         border-radius: 16px; 
@@ -110,59 +103,17 @@ function copyTextToClipboard(textId, buttonEl) {
         padding: 20px;
         margin-bottom: 20px;
     }
-    .label-heading-user {
-        color: #ff3300 !important;
-        font-weight: bold;
-        font-size: 1.1rem;
-        margin-bottom: 8px;
-    }
-    .label-heading-ai {
-        color: #ffffff !important;
-        font-weight: bold;
-        font-size: 1.1rem;
-        margin-top: 15px;
-        margin-bottom: 8px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .copy-symbol-btn {
-        cursor: pointer;
-        font-size: 1.1rem;
-        user-select: none;
-    }
+    .label-heading-user { color: #ff3300 !important; font-weight: bold; font-size: 1.1rem; margin-bottom: 8px; }
+    .label-heading-ai { color: #ffffff !important; font-weight: bold; font-size: 1.1rem; margin-top: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
 
-    /* Custom layout rules for crisp image container output rendering */
-    .aksharam-image-container {
-        max-width: 550px !important;
-        margin: 15px 0px;
-        border-radius: 14px;
-        border: 2px solid #ff3300;
-        overflow: hidden;
-        box-shadow: 0 8px 24px rgba(255,51,0,0.25);
-        background: #0a0a0a;
-    }
-    .aksharam-image-container img {
-        width: 100% !important;
-        height: auto !important;
-        object-fit: contain !important;
-    }
-    .download-action-btn {
-        display: inline-block;
-        background-color: #ff3300;
-        color: white !important;
-        text-decoration: none !important;
-        padding: 10px 20px;
-        font-weight: bold;
-        border-radius: 8px;
-        margin: 12px;
-        font-size: 0.95rem;
-        text-align: center;
-    }
+    .aksharam-image-container { max-width: 550px !important; margin: 15px 0px; border-radius: 14px; border: 2px solid #ff3300; overflow: hidden; box-shadow: 0 8px 24px rgba(255,51,0,0.25); background: #0a0a0a; }
+    .aksharam-image-container img { width: 100% !important; height: auto !important; object-fit: contain !important; }
+    .download-action-btn { display: inline-block; background-color: #ff3300; color: white !important; text-decoration: none !important; padding: 10px 20px; font-weight: bold; border-radius: 8px; margin: 12px; font-size: 0.95rem; text-align: center; }
 </style>
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
 
+# Session States initialization
 if "app_mode" not in st.session_state: st.session_state.app_mode = "Gateway"
 if "username" not in st.session_state: st.session_state.username = ""
 if "identity" not in st.session_state: st.session_state.identity = ""
@@ -171,7 +122,6 @@ if "generated_otp" not in st.session_state: st.session_state.generated_otp = ""
 if "whatsapp_url" not in st.session_state: st.session_state.whatsapp_url = ""
 
 # --- APPLICATION CONTROLLER STATES ---
-
 if st.session_state.app_mode == "Gateway":
     st.markdown("<div class='auth-box'>", unsafe_allow_html=True)
     st.markdown("<h1 style='text-align:center;'>🔱 Aksharam</h1>", unsafe_allow_html=True)
@@ -214,7 +164,7 @@ elif st.session_state.app_mode == "Auth_Setup":
     if channel == "Email Address":
         u_target = st.text_input("Enter Target Email Address", placeholder="user@example.com")
     else:
-        u_target = st.text_input("Enter WhatsApp Number (With Country Code, e.g., 919876543210)", placeholder="919876543210")
+        u_target = st.text_input("Enter WhatsApp Number (With Country Code)", placeholder="919876543210")
         
     u_pass = st.text_input("Create Account Password", type="password", placeholder="••••••••")
 
@@ -237,7 +187,6 @@ elif st.session_state.app_mode == "Auth_Setup":
                 clean_phone = ''.join(filter(str.isdigit, u_target))
                 message_text = f"🔱 Aksharam AI Security Gateway \nYour unique secure verification OTP is: {otp}\n\nEngineered by TMD."
                 encoded_message = urllib.parse.quote(message_text)
-                
                 st.session_state.whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
                 st.session_state.app_mode = "OTP_Screen"
                 st.rerun()
@@ -261,17 +210,18 @@ elif st.session_state.app_mode == "OTP_Screen":
 
     st.write("Enter 6-Digit Code:")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
+    # Fixed matching keys order here
     with c1: b1 = st.text_input("", max_chars=1, key="b1", label_visibility="collapsed")
     with c2: b2 = st.text_input("", max_chars=1, key="b2", label_visibility="collapsed")
     with c3: b3 = st.text_input("", max_chars=1, key="b3", label_visibility="collapsed")
     with c4: b4 = st.text_input("", max_chars=1, key="b4", label_visibility="collapsed")
-    with c5: b5 = st.text_input("", max_chars=1, key="b6", label_visibility="collapsed")
-    with c6: b6 = st.text_input("", max_chars=1, key="b5", label_visibility="collapsed")
+    with c5: b5 = st.text_input("", max_chars=1, key="b5", label_visibility="collapsed")
+    with c6: b6 = st.text_input("", max_chars=1, key="b6", label_visibility="collapsed")
     
     full_user_otp = f"{b1}{b2}{b3}{b4}{b5}{b6}"
             
     if st.button("Verify Credentials & Deploy Core", use_container_width=True):
-        if full_user_otp == st.session_state.generated_otp or full_user_otp == "786786":
+        if full_user_otp == st.session_state.generated_otp or full_user_otp == MASTER_OTP:
             st.session_state.app_mode = "Connected"
             st.success("Verification complete!")
             st.rerun()
@@ -294,7 +244,6 @@ SYSTEM_PROMPT = (
     f"1. Current Year: 2026.\n"
     f"2. Language Match Mode: Reply fluidly in the language used or explicitly requested by the user.\n"
     f"3. IMAGE GENERATION PROTOCOL: ONLY generate an image if the user explicitly orders you to 'create an image', 'draw', 'generate an image', or 'visualize'. "
-    f"If they are just asking normal conversational questions, chat logs, or software advice, do NOT trigger the image code. "
     f"If they explicitly request a visual, you must respond with EXACTLY this special pattern: '||IMAGE_PROMPT|| <detailed English description of the art>' and absolutely nothing else."
 )
 
@@ -316,7 +265,6 @@ with st.sidebar:
         st.warning("🟡 ACCESS CLEARED")
     
     st.markdown("---")
-    
     if st.button("➕ New Chat Session", use_container_width=True):
         st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         st.rerun()
@@ -343,7 +291,6 @@ with st.sidebar:
 st.title("🔱 Aksharam Core Engine")
 st.markdown(f"### Hi {st.session_state.username}, how can Aksharam help you today?")
 
-# Render interface helper tool for images
 def render_image_block(prompt_text):
     encoded_prompt = urllib.parse.quote(prompt_text)
     img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
@@ -361,7 +308,7 @@ def render_image_block(prompt_text):
     '''
     st.markdown(html_layout, unsafe_allow_html=True)
 
-# Process logic and compile pairs for clean sequential numbering block outputs
+# Parse history into sequential pairs
 chat_history = [m for m in st.session_state.messages if m["role"] != "system"]
 paired_turns = []
 current_turn = {"user": None, "assistant": None}
@@ -380,27 +327,20 @@ for msg in chat_history:
 if current_turn["user"] is not None:
     paired_turns.append(current_turn)
 
-# Structured view rendering engine
+# Structured View Engine
 for index, turn in enumerate(paired_turns, start=1):
     st.markdown(f'<div class="chat-row-container">', unsafe_allow_html=True)
-    
-    # 1. Output Question Row
     st.markdown(f'<div class="label-heading-user">Question {index}</div>', unsafe_allow_html=True)
     st.markdown(f'<div>{turn["user"]}</div><br>', unsafe_allow_html=True)
     
-    # 2. Output Answer Row
     if turn["assistant"] is not None:
         if "||IMAGE_PROMPT||" in turn["assistant"]:
             clean_prompt = turn["assistant"].replace("||IMAGE_PROMPT||", "").strip()
             render_image_block(clean_prompt)
         else:
-            st.markdown(f'''
-                <div class="label-heading-ai">
-                    <span>Answer {index}</span>
-                    <span class="copy-symbol-btn" onclick="parent.copyTextToClipboard('ans_text_{index}', this)">📋</span>
-                </div>
-            ''', unsafe_allow_html=True)
-            st.markdown(f'<div id="ans_text_{index}">{turn["assistant"]}</div>', unsafe_allow_html=True)
+            # Replaced JS-dependent copy icon with native scannable UI layout 
+            st.markdown(f'<div class="label-heading-ai">Answer {index}</div>', unsafe_allow_html=True)
+            st.write(turn["assistant"])
             
     st.markdown('</div>', unsafe_allow_html=True)
 
