@@ -65,7 +65,7 @@ def supabase_request(table, method="GET", json_data=None, params=None):
         if method == "POST": return cl.post(url, headers=headers, json=json_data)
         return cl.get(url, headers=headers, params=params)
 
-# Inject 3D Visual Styling & CLEAN UI OVERRIDES
+# Inject 3D Visual Styling & CLEAN UI OVERRIDES WITH SHARP IMAGE LAYOUT MANAGEMENT
 vanta_3d_html = """
 <div id="vanta-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
@@ -89,6 +89,42 @@ vanta_3d_html = """
     .auth-box { background: rgba(10, 10, 10, 0.9) !important; border: 2px solid #ff3300 !important; padding: 30px; border-radius: 15px; max-width: 500px; margin: 40px auto; box-shadow: 0 0 30px rgba(255, 51, 0, 0.3); }
     .quote-box { font-style: italic; color: #ff3300; text-align: center; margin-bottom: 20px; font-size: 1.1rem; font-weight: bold; }
     h1, h2, h3, p, span, label { color: #ffffff !important; }
+
+    /* Custom high clarity crisp view layout rules for images */
+    .aksharam-image-container {
+        max-width: 550px !important;
+        margin: 15px 0px;
+        border-radius: 14px;
+        border: 2px solid #ff3300;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(255,51,0,0.25);
+        background: #0a0a0a;
+    }
+    .aksharam-image-container img {
+        width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
+        image-rendering: -webkit-optimize-contrast !important;
+        image-rendering: crisp-edges !important;
+    }
+    .download-action-btn {
+        display: inline-block;
+        background-color: #ff3300;
+        color: white !important;
+        text-decoration: none !important;
+        padding: 10px 20px;
+        font-weight: bold;
+        border-radius: 8px;
+        margin: 12px;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(255,51,0,0.3);
+    }
+    .download-action-btn:hover {
+        background-color: #ff5522;
+        transform: translateY(-2px);
+    }
 </style>
 """
 st.components.v1.html(vanta_3d_html, height=0, width=0)
@@ -243,7 +279,7 @@ with st.sidebar:
     else:
         st.warning("🟡 GUEST CLEARANCE ONLY")
     st.markdown("---")
-    st.markdown("💡 **Tip:** Try saying: *'Create an image of a golden trident over a futuristic city'* or *'સિંહનું સુંદર ચિત્ર બનાવો'*")
+    st.markdown("💡 **Tip:** Say: *'Create an image of a golden trident'* or *'સિંહનું ચિત્ર બનાવો'*")
     st.markdown("---")
     if st.button("🔒 Secure Session Exit", use_container_width=True):
         st.session_state.app_mode = "Gateway"
@@ -253,16 +289,33 @@ with st.sidebar:
 st.title("🔱 Aksharam Core Engine")
 st.markdown(f"### Hi {st.session_state.username}, how can Aksharam help you today?")
 
-# Render previous logs safely (and clean up structural image tags if needed)
+# Render interface helper tool
+def render_image_block(prompt_text):
+    encoded_prompt = urllib.parse.quote(prompt_text)
+    img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
+    
+    st.info(f"🎨 Visual matrix deployed for prompt: *{prompt_text}*")
+    
+    # Custom HTML layout frame containing optimized container with sharp image scaling and download buttons
+    html_layout = f'''
+    <div class="aksharam-image-container">
+        <img src="{img_url}" alt="Aksharam AI Generated Output">
+        <div style="text-align: center; background: #111; padding: 5px 0px;">
+            <a href="{img_url}" download="Aksharam_AI_Output.jpg" target="_blank" class="download-action-btn">
+                📥 Download Full HD Image
+            </a>
+        </div>
+    </div>
+    '''
+    st.markdown(html_layout, unsafe_allow_html=True)
+
+# Render previous logs safely 
 for message in st.session_state.messages:
     if message["role"] != "system":
         with st.chat_message(message["role"]):
             if "||IMAGE_PROMPT||" in message["content"]:
                 clean_prompt = message["content"].replace("||IMAGE_PROMPT||", "").strip()
-                encoded_prompt = urllib.parse.quote(clean_prompt)
-                img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
-                st.info(f"🖼️ Generated Image for: *{clean_prompt}*")
-                st.image(img_url, use_container_width=True)
+                render_image_block(clean_prompt)
             else:
                 st.markdown(message["content"])
 
@@ -290,12 +343,8 @@ if user_input := st.chat_input("Query Aksharam Framework..."):
             # Check if the generated response triggered our image protocol
             if "||IMAGE_PROMPT||" in full_response:
                 clean_prompt = full_response.replace("||IMAGE_PROMPT||", "").strip()
-                encoded_prompt = urllib.parse.quote(clean_prompt)
-                img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true"
-                
                 response_placeholder.empty()
-                st.info(f"🎨 Generating visual matrix for: *{clean_prompt}*")
-                st.image(img_url, use_container_width=True)
+                render_image_block(clean_prompt)
                 
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 supabase_request("chat_logs", "POST", {"email": st.session_state.identity, "role": "assistant", "content": full_response})
